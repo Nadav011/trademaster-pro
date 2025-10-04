@@ -723,6 +723,38 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  try {
+                    // Get local data first
+                    const localTrades = await tradeDatabase.findAll()
+                    const localCapital = await capitalDatabase.getCapitalHistory()
+                    
+                    alert(`נתונים מקומיים:\nעסקאות: ${localTrades.length}\nרשומות הון: ${localCapital.length}\n\nלחץ OK כדי לבצע סינכרון מפורט...`)
+                    
+                    // Perform detailed sync
+                    const { triggerAutoSync } = await import('@/lib/supabase')
+                    await triggerAutoSync()
+                    
+                    // Get data after sync
+                    const finalTrades = await tradeDatabase.findAll()
+                    const finalCapital = await capitalDatabase.getCapitalHistory()
+                    
+                    alert(`אחרי סינכרון:\nעסקאות: ${finalTrades.length}\nרשומות הון: ${finalCapital.length}\n\nשינויים:\nעסקאות: ${finalTrades.length - localTrades.length}\nרשומות הון: ${finalCapital.length - localCapital.length}`)
+                    
+                    // Reload dashboard
+                    loadDashboardData()
+                  } catch (error) {
+                    alert(`שגיאה: ${error}`)
+                  }
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">סינכרון מפורט</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
                   // Create sample data for testing
                   const sampleTrade = {
                     symbol: 'AAPL',

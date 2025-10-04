@@ -257,10 +257,16 @@ export class SyncManager {
       const { data: cloudData, error: downloadError } = await dataSync.downloadUserData(user.id)
       
       if (downloadError) {
-        console.error('Download failed:', downloadError)
+        console.error('❌ Download failed:', downloadError)
         this.syncStatus.error = downloadError.message
         return
       }
+      
+      console.log('📥 Download result:', {
+        hasData: !!cloudData,
+        tradesCount: cloudData?.trades?.length || 0,
+        capitalCount: cloudData?.capital?.length || 0
+      })
       
       if (cloudData) {
         console.log('🔄 Merging cloud data with local data...')
@@ -278,12 +284,22 @@ export class SyncManager {
         const localTradeIds = new Set(localTrades.map(t => t.id))
         
         console.log('🔍 Checking for new trades from cloud...')
+        console.log('🔍 Local trade IDs:', Array.from(localTradeIds))
+        console.log('🔍 Cloud trade IDs:', cloudTrades.map((t: any) => t.id))
+        
         let newTradesAdded = 0
         for (const cloudTrade of cloudTrades) {
           if (!localTradeIds.has(cloudTrade.id)) {
             console.log('➕ Adding new trade from cloud:', cloudTrade.id, cloudTrade.symbol)
-            await tradesDb.create(cloudTrade)
-            newTradesAdded++
+            try {
+              await tradesDb.create(cloudTrade)
+              newTradesAdded++
+              console.log('✅ Trade added successfully:', cloudTrade.id)
+            } catch (createError) {
+              console.error('❌ Failed to add trade:', createError)
+            }
+          } else {
+            console.log('⚠️ Trade already exists locally:', cloudTrade.id)
           }
         }
         
@@ -317,6 +333,25 @@ export class SyncManager {
         trades: finalTrades.length,
         capital: finalCapital.length
       })
+      
+      // Check if data actually changed
+      const tradesChanged = finalTrades.length !== localTrades.length
+      const capitalChanged = finalCapital.length !== localCapital.length
+      
+      console.log('🔄 Data changes detected:', {
+        tradesChanged,
+        capitalChanged,
+        tradesBefore: localTrades.length,
+        tradesAfter: finalTrades.length,
+        capitalBefore: localCapital.length,
+        capitalAfter: finalCapital.length
+      })
+      
+      if (tradesChanged || capitalChanged) {
+        console.log('✅ Sync successful - data was updated')
+      } else {
+        console.log('⚠️ Sync completed but no data changes detected')
+      }
       
       this.syncStatus.lastSync = new Date()
       this.syncStatus.error = null
