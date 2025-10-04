@@ -552,7 +552,7 @@ export default function Dashboard() {
     const autoSyncOnLoad = async () => {
       try {
         // Check if user should be authenticated
-        const { auth } = await import('@/lib/supabase')
+        const { auth, startAutoSyncService } = await import('@/lib/supabase')
         const isAuthStateSaved = auth.isAuthStateSaved()
         const savedEmail = auth.getSavedUserEmail()
         
@@ -565,6 +565,11 @@ export default function Dashboard() {
           const { triggerAutoSync } = await import('@/lib/supabase')
           await triggerAutoSync()
           console.log('✅ Auto-sync on page load completed')
+          
+          // Start the periodic auto-sync service for multi-device sync
+          console.log('🚀 Starting periodic auto-sync service...')
+          await startAutoSyncService(15000) // Every 15 seconds for better responsiveness
+          
           // Reload dashboard data after sync
           setTimeout(loadDashboardData, 1000)
         } else {
@@ -577,6 +582,23 @@ export default function Dashboard() {
     
     // Run auto-sync after a short delay to ensure page is loaded
     setTimeout(autoSyncOnLoad, 2000)
+    
+    // Listen for sync events from other tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'trademaster_sync_event' && e.newValue) {
+        try {
+          const event = JSON.parse(e.newValue)
+          if (event.type === 'DATA_SYNCED') {
+            console.log('📱 Data synced from another tab, reloading dashboard...')
+            loadDashboardData()
+          }
+        } catch (error) {
+          console.error('Failed to parse sync event:', error)
+        }
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
     
     // Auto-refresh dashboard data every 5 minutes
     const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
@@ -596,6 +618,12 @@ export default function Dashboard() {
     return () => {
       clearInterval(interval)
       clearInterval(priceInterval)
+      window.removeEventListener('storage', handleStorageChange)
+      
+      // Stop auto-sync service when component unmounts
+      import('@/lib/supabase').then(({ stopAutoSyncService }) => {
+        stopAutoSyncService()
+      })
     }
   }, [])
 
@@ -828,6 +856,30 @@ export default function Dashboard() {
               >
                 <RefreshCw className="h-4 w-4" />
                 <span className="hidden sm:inline">סנכרן</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const { isAutoSyncRunning, startAutoSyncService, stopAutoSyncService } = await import('@/lib/supabase')
+                    const isRunning = isAutoSyncRunning()
+                    
+                    if (isRunning) {
+                      stopAutoSyncService()
+                      alert('סינכרון אוטומטי הופסק')
+                    } else {
+                      await startAutoSyncService(15000)
+                      alert('סינכרון אוטומטי הופעל (כל 15 שניות)')
+                    }
+                  } catch (error) {
+                    alert(`שגיאה: ${error}`)
+                  }
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">סינכרון אוטומטי</span>
               </Button>
               <Button
                 variant="outline"

@@ -163,6 +163,15 @@ export default function TradeDetails() {
       const { triggerAutoSync } = await import('@/lib/supabase')
       await triggerAutoSync()
 
+      // Notify other tabs about the sync
+      const event = {
+        type: 'DATA_SYNCED',
+        timestamp: Date.now(),
+        message: 'Trade closed and synced'
+      }
+      localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
+      setTimeout(() => localStorage.removeItem('trademaster_sync_event'), 1000)
+
       await loadTrade()
     } catch (err) {
       console.error('Failed to close trade:', err)

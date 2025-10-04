@@ -75,11 +75,29 @@ export const auth = {
 
   async getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser()
+    
+    // Save auth state to localStorage if user is authenticated
+    if (user && typeof window !== 'undefined') {
+      localStorage.setItem('trademaster_auth_state', 'authenticated')
+      localStorage.setItem('trademaster_user_email', user.email || '')
+      localStorage.setItem('trademaster_user_id', user.id)
+      console.log('💾 Auth state saved to localStorage for user:', user.email)
+    }
+    
     return user
   },
 
   async getSession() {
     const { data: { session } } = await supabase.auth.getSession()
+    
+    // Save auth state to localStorage if session exists
+    if (session?.user && typeof window !== 'undefined') {
+      localStorage.setItem('trademaster_auth_state', 'authenticated')
+      localStorage.setItem('trademaster_user_email', session.user.email || '')
+      localStorage.setItem('trademaster_user_id', session.user.id)
+      console.log('💾 Session saved to localStorage for user:', session.user.email)
+    }
+    
     return session
   },
 
@@ -93,6 +111,15 @@ export const auth = {
   getSavedUserEmail(): string | null {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('trademaster_user_email')
+  },
+
+  // Clear auth state from localStorage
+  clearAuthState(): void {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem('trademaster_auth_state')
+    localStorage.removeItem('trademaster_user_email')
+    localStorage.removeItem('trademaster_user_id')
+    console.log('🗑️ Auth state cleared from localStorage')
   }
 }
 
@@ -379,4 +406,251 @@ export const triggerAutoSync = async () => {
   } catch (error) {
     console.error('Auto-sync trigger failed:', error)
   }
+}
+
+// Advanced auto-sync system for multi-device synchronization
+class AutoSyncService {
+  private static instance: AutoSyncService
+  private intervalId: NodeJS.Timeout | null = null
+  private lastSyncTime: string | null = null
+  private isRunning = false
+
+  static getInstance(): AutoSyncService {
+    if (!AutoSyncService.instance) {
+      AutoSyncService.instance = new AutoSyncService()
+    }
+    return AutoSyncService.instance
+  }
+
+  async startPeriodicSync(intervalMs: number = 30000) { // Default: 30 seconds
+    if (this.isRunning) {
+      console.log('⚠️ Auto-sync service already running')
+      return
+    }
+
+    console.log('🚀 Starting periodic auto-sync service (every', intervalMs / 1000, 'seconds)')
+    this.isRunning = true
+
+    // Check authentication first
+    const user = await auth.getCurrentUser()
+    if (!user) {
+      console.log('⚠️ No authenticated user, skipping auto-sync service')
+      this.isRunning = false
+      return
+    }
+
+    // Initial sync
+    await this.performSync()
+
+    // Set up periodic sync
+    this.intervalId = setInterval(async () => {
+      await this.performSync()
+    }, intervalMs)
+  }
+
+  stopPeriodicSync() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId)
+      this.intervalId = null
+    }
+    this.isRunning = false
+    console.log('🛑 Stopped periodic auto-sync service')
+  }
+
+  private async performSync() {
+    try {
+      const user = await auth.getCurrentUser()
+      if (!user) {
+        console.log('⚠️ No authenticated user for periodic sync')
+        return
+      }
+
+      console.log('🔄 Performing periodic sync check...')
+
+      // Check if there are changes in the cloud
+      const { data: cloudData, error } = await dataSync.downloadUserData(user.id)
+      
+      if (error) {
+        console.error('❌ Failed to check cloud data:', error)
+        return
+      }
+
+      if (!cloudData) {
+        console.log('📭 No cloud data found')
+        return
+      }
+
+      // Check if cloud data is newer than last sync
+      const cloudLastSync = cloudData.last_sync
+      if (this.lastSyncTime && cloudLastSync <= this.lastSyncTime) {
+        console.log('📊 Cloud data is up to date, no sync needed')
+        return
+      }
+
+      console.log('📥 Cloud data is newer, performing sync...')
+      
+      // Import the database client
+      const { tradesDb, capitalDb } = await import('./database-client')
+      
+      // Clear existing data
+      const existingTrades = await tradesDb.findAll()
+      const existingCapital = await capitalDb.findAll()
+      
+      console.log('🗑️ Clearing existing data - trades:', existingTrades.length, 'capital:', existingCapital.length)
+      
+      // Clear existing data
+      for (const trade of existingTrades) {
+        await tradesDb.delete(trade.id)
+      }
+      for (const capital of existingCapital) {
+        await capitalDb.delete(capital.id)
+      }
+      
+      // Import the new data
+      let importedTrades = 0
+      let importedCapital = 0
+      
+      for (const trade of cloudData.trades || []) {
+        await tradesDb.create(trade)
+        importedTrades++
+      }
+      
+      for (const capital of cloudData.capital || []) {
+        await capitalDb.create(capital)
+        importedCapital++
+      }
+      
+      this.lastSyncTime = cloudLastSync
+      
+      console.log('✅ Periodic sync completed - trades:', importedTrades, 'capital:', importedCapital)
+      
+      // Show notification if data changed
+      if (importedTrades > 0 || importedCapital > 0) {
+        this.showSyncNotification(`נתונים עודכנו: ${importedTrades} עסקאות, ${importedCapital} רשומות הון`)
+        
+        // Trigger page refresh for all open tabs
+        this.notifyOtherTabs()
+      }
+
+    } catch (error) {
+      console.error('❌ Periodic sync failed:', error)
+    }
+  }
+
+  private showSyncNotification(message: string) {
+    // Create notification element
+    const notification = document.createElement('div')
+    notification.textContent = message
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10000;
+      font-family: 'Assistant', Arial, sans-serif;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: slideIn 0.3s ease-out;
+    `
+    
+    // Add animation
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    `
+    document.head.appendChild(style)
+    
+    document.body.appendChild(notification)
+    
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification)
+      }
+      if (document.head.contains(style)) {
+        document.head.removeChild(style)
+      }
+    }, 4000)
+  }
+
+  private notifyOtherTabs() {
+    // Use localStorage to notify other tabs
+    const event = {
+      type: 'DATA_SYNCED',
+      timestamp: Date.now(),
+      message: 'Data has been synced from another device'
+    }
+    
+    localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
+    
+    // Remove the event after a short delay
+    setTimeout(() => {
+      localStorage.removeItem('trademaster_sync_event')
+    }, 1000)
+  }
+
+  isServiceRunning(): boolean {
+    return this.isRunning
+  }
+}
+
+export const autoSyncService = AutoSyncService.getInstance()
+
+// Function to start auto-sync service
+export const startAutoSyncService = async (intervalMs?: number) => {
+  await autoSyncService.startPeriodicSync(intervalMs)
+}
+
+// Function to stop auto-sync service
+export const stopAutoSyncService = () => {
+  autoSyncService.stopPeriodicSync()
+}
+
+// Function to check if auto-sync is running
+export const isAutoSyncRunning = () => {
+  return autoSyncService.isServiceRunning()
+}
+
+// Initialize auth state listener for better localStorage management
+export const initializeAuthListener = () => {
+  if (typeof window === 'undefined') return
+
+  console.log('🔧 Initializing auth state listener...')
+  
+  // Listen for auth state changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('🔄 Auth state changed:', event, session?.user?.email)
+    
+    if (session?.user) {
+      // User signed in - save to localStorage
+      localStorage.setItem('trademaster_auth_state', 'authenticated')
+      localStorage.setItem('trademaster_user_email', session.user.email || '')
+      localStorage.setItem('trademaster_user_id', session.user.id)
+      console.log('💾 Auth state saved to localStorage for user:', session.user.email)
+      
+      // Start auto-sync service if not already running
+      if (!autoSyncService.isServiceRunning()) {
+        console.log('🚀 Starting auto-sync service due to auth state change')
+        autoSyncService.startPeriodicSync(15000)
+      }
+    } else {
+      // User signed out - clear localStorage
+      localStorage.removeItem('trademaster_auth_state')
+      localStorage.removeItem('trademaster_user_email')
+      localStorage.removeItem('trademaster_user_id')
+      console.log('🗑️ Auth state cleared from localStorage')
+      
+      // Stop auto-sync service
+      if (autoSyncService.isServiceRunning()) {
+        console.log('🛑 Stopping auto-sync service due to auth state change')
+        autoSyncService.stopPeriodicSync()
+      }
+    }
+  })
 }

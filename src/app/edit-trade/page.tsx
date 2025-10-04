@@ -309,6 +309,15 @@ export default function EditTrade() {
         const { triggerAutoSync } = await import('@/lib/supabase')
         await triggerAutoSync()
         console.log('✅ Auto-sync completed after trade update')
+        
+        // Notify other tabs about the sync
+        const event = {
+          type: 'DATA_SYNCED',
+          timestamp: Date.now(),
+          message: 'Trade updated and synced'
+        }
+        localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
+        setTimeout(() => localStorage.removeItem('trademaster_sync_event'), 1000)
       } catch (syncError) {
         console.error('❌ Auto-sync failed after trade update:', syncError)
       }
