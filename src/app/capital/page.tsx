@@ -26,6 +26,7 @@ import {
   marketDataUtils,
   initializeDatabase 
 } from '@/lib/database-client'
+import { triggerAutoSync } from '@/lib/supabase'
 import { 
   Capital, 
   CapitalSummary,
@@ -170,6 +171,10 @@ export default function CapitalManagement() {
       }
 
       await capitalDb.create(capitalData)
+      
+      // Trigger auto-sync after creating capital record
+      console.log('🔄 Capital record created, triggering auto-sync...')
+      await triggerAutoSync()
       
       // Reset form
       setFormData({

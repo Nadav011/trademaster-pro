@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qhbnlyiupbamhmbtqruz.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
 
+// Debug logging
+console.log('🔧 Supabase URL:', supabaseUrl)
+console.log('🔑 Supabase Key:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'NOT FOUND')
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Database types
@@ -146,13 +150,28 @@ export class SyncManager {
         return
       }
 
-      // Import local data sync logic here
       console.log('🔄 Auto-syncing data...')
       
-      this.syncStatus.lastSync = new Date()
-      this.syncStatus.error = null
+      // Import the database client
+      const { tradeDatabase, capitalDatabase } = await import('./database-client')
+      
+      // Get current data
+      const trades = await tradeDatabase.findAll()
+      const capital = await capitalDatabase.getCapitalHistory()
+      
+      // Upload to Supabase
+      const { error } = await dataSync.uploadUserData(user.id, trades, capital)
+      
+      if (error) {
+        console.error('Auto-sync failed:', error)
+        this.syncStatus.error = error.message
+      } else {
+        console.log('✅ Auto-sync successful')
+        this.syncStatus.lastSync = new Date()
+        this.syncStatus.error = null
+      }
     } catch (error) {
-      console.error('Sync failed:', error)
+      console.error('Auto-sync failed:', error)
       this.syncStatus.error = error instanceof Error ? error.message : 'Sync failed'
     } finally {
       this.syncStatus.isSyncing = false
@@ -165,3 +184,13 @@ export class SyncManager {
 }
 
 export const syncManager = SyncManager.getInstance()
+
+// Auto-sync function to be called after data changes
+export const triggerAutoSync = async () => {
+  try {
+    console.log('🔄 Triggering auto-sync...')
+    await syncManager.autoSync()
+  } catch (error) {
+    console.error('Auto-sync trigger failed:', error)
+  }
+}

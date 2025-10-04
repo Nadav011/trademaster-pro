@@ -30,6 +30,8 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
   const [isManualSync, setIsManualSync] = useState(false)
 
   useEffect(() => {
+    console.log('🔄 SyncManagerComponent mounted')
+    
     // Check authentication status
     checkAuthStatus()
     
@@ -55,6 +57,9 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
       
       setIsAuthenticated(isAuth)
       setUser(currentUser)
+      
+      console.log('🔄 State updated - isAuthenticated:', isAuth)
+      console.log('🔄 State updated - user:', currentUser)
     } catch (error) {
       console.error('❌ Auth check failed:', error)
       setIsAuthenticated(false)
@@ -185,7 +190,11 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
     return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
   }
 
+  console.log('🎨 Rendering SyncManager - isAuthenticated:', isAuthenticated)
+  console.log('🎨 Rendering SyncManager - user:', user)
+
   if (!isAuthenticated) {
+    console.log('🚫 Rendering not authenticated view')
     return (
       <Card className="apple-card">
         <CardHeader>

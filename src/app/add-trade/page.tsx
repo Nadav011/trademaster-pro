@@ -18,6 +18,7 @@ import {
   calculateTradeMetrics,
   initializeDatabase 
 } from '@/lib/database-client'
+import { triggerAutoSync } from '@/lib/supabase'
 import { marketDataUtils, finnhubAPI } from '@/lib/finnhub'
 import { apiConfig } from '@/lib/api-config'
 import { 
@@ -243,6 +244,11 @@ export default function AddTrade() {
       }
 
       await tradesDb.create(tradeData)
+      
+      // Trigger auto-sync after creating trade
+      console.log('🔄 Trade created, triggering auto-sync...')
+      await triggerAutoSync()
+      
       router.push('/')
     } catch (err) {
       console.error('Failed to create trade:', err)
