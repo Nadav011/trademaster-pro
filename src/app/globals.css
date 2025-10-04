@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    direction: rtl;
+    font-family: 'Assistant', 'Inter', sans-serif;
+  }
+  
+  /* RTL Support */
+  [dir="rtl"] {
+    direction: rtl;
+  }
+  
+  [dir="ltr"] {
+    direction: ltr;
+  }
+  
+  /* Hebrew font support */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Assistant', 'Inter', sans-serif;
+  }
+  
+  p, span, div {
+    font-family: 'Assistant', 'Inter', sans-serif;
+  }
+}
+
+/* Custom styles for TradeMaster Pro */
+.trade-card {
+  @apply bg-card border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow;
+}
+
+.profit-positive {
+  @apply text-green-600 dark:text-green-400;
+}
+
+.profit-negative {
+  @apply text-red-600 dark:text-red-400;
+}
+
+.profit-neutral {
+  @apply text-muted-foreground;
+}
+
+/* Loading animations */
+.loading-spinner {
+  @apply animate-spin rounded-full h-4 w-4 border-b-2 border-primary;
+}
+
+/* Apple-inspired clean design */
+.apple-card {
+  @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-gray-900/20;
+}
+
+.apple-button {
+  @apply bg-blue-500 hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+.apple-input {
+  @apply bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200;
+}
+
+/* Fix floating elements */
+.dialog-content {
+  @apply fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2;
+}
+
+.dialog-overlay {
+  @apply fixed inset-0 z-40 bg-black/50;
+}
+
+/* Ensure proper stacking context */
+[data-radix-dialog-content] {
+  @apply z-50;
+}
+
+[data-radix-dialog-overlay] {
+  @apply z-40;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .apple-card {
+    @apply mx-2;
+  }
+  
+  .apple-button {
+    @apply px-4 py-2 text-sm;
+  }
+  
+  /* Improve touch targets */
+  button, [role="button"] {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Better spacing on mobile */
+  .space-y-8 > * + * {
+    @apply mt-6;
+  }
+  
+  .space-y-6 > * + * {
+    @apply mt-4;
+  }
+  
+  /* Improve form inputs on mobile */
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
+/* Prevent zoom on input focus on iOS */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
