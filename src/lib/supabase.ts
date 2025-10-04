@@ -106,7 +106,7 @@ export const dataSync = {
 export class SyncManager {
   private static instance: SyncManager
   private syncStatus: SyncStatus = {
-    isOnline: navigator.onLine,
+    isOnline: typeof window !== 'undefined' ? navigator.onLine : true,
     lastSync: null,
     isSyncing: false,
     error: null

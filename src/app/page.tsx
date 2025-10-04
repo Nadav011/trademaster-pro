@@ -501,7 +501,7 @@ export default function Dashboard() {
       console.log('Weekly change dollars:', weeklyChangeDollars)
 
       // Check if running on mobile and warn about data sync
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       if (isMobile && allTrades.length === 0) {
         setError('הנתונים לא מסונכרנים עם הנייד. אנא הוסף נתונים דרך הדסקטופ או לחץ על כפתור הרענון.')
       }
