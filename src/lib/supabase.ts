@@ -422,13 +422,13 @@ class AutoSyncService {
     return AutoSyncService.instance
   }
 
-  async startPeriodicSync(intervalMs: number = 30000) { // Default: 30 seconds
+  async startPeriodicSync(intervalMs: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
     if (this.isRunning) {
       console.log('⚠️ Auto-sync service already running')
       return
     }
 
-    console.log('🚀 Starting periodic auto-sync service (every', intervalMs / 1000, 'seconds)')
+    console.log('🚀 Starting daily auto-sync service (every', intervalMs / (1000 * 60 * 60), 'hours)')
     this.isRunning = true
 
     // Check authentication first
@@ -439,12 +439,23 @@ class AutoSyncService {
       return
     }
 
-    // Initial sync
-    await this.performSync()
+    // Initial sync only if needed
+    const lastSync = localStorage.getItem('trademaster_last_daily_sync')
+    const now = Date.now()
+    const oneDayAgo = now - (24 * 60 * 60 * 1000)
+    
+    if (!lastSync || parseInt(lastSync) < oneDayAgo) {
+      console.log('📅 Performing initial daily sync...')
+      await this.performSync()
+      localStorage.setItem('trademaster_last_daily_sync', now.toString())
+    } else {
+      console.log('✅ Daily sync already performed today, skipping initial sync')
+    }
 
-    // Set up periodic sync
+    // Set up daily sync
     this.intervalId = setInterval(async () => {
       await this.performSync()
+      localStorage.setItem('trademaster_last_daily_sync', Date.now().toString())
     }, intervalMs)
   }
 
@@ -615,6 +626,32 @@ export const stopAutoSyncService = () => {
 // Function to check if auto-sync is running
 export const isAutoSyncRunning = () => {
   return autoSyncService.isServiceRunning()
+}
+
+// Function for immediate sync after operations (add, edit, delete)
+export const performImmediateSync = async () => {
+  try {
+    console.log('🔄 Performing immediate sync after operation...')
+    
+    const user = await auth.getCurrentUser()
+    if (!user) {
+      console.log('⚠️ No authenticated user for immediate sync')
+      return
+    }
+
+    // Use the existing sync manager for immediate sync
+    await syncManager.autoSync()
+    
+    // Show notification
+    autoSyncService.showSyncNotification('נתונים מסונכרנים בהצלחה!')
+    
+    // Notify other tabs
+    autoSyncService.notifyOtherTabs()
+    
+    console.log('✅ Immediate sync completed')
+  } catch (error) {
+    console.error('❌ Immediate sync failed:', error)
+  }
 }
 
 // Initialize auth state listener for better localStorage management

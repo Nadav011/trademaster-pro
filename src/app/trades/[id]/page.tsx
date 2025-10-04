@@ -153,19 +153,10 @@ export default function TradeDetails() {
         notes: closeData.notes,
       })
 
-      // Trigger auto-sync after closing trade
-      console.log('🔄 Trade closed, triggering auto-sync...')
-      const { triggerAutoSync } = await import('@/lib/supabase')
-      await triggerAutoSync()
-
-      // Notify other tabs about the sync
-      const event = {
-        type: 'DATA_SYNCED',
-        timestamp: Date.now(),
-        message: 'Trade closed and synced'
-      }
-      localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
-      setTimeout(() => localStorage.removeItem('trademaster_sync_event'), 1000)
+      // Trigger immediate sync after closing trade
+      console.log('🔄 Trade closed, triggering immediate sync...')
+      const { performImmediateSync } = await import('@/lib/supabase')
+      await performImmediateSync()
 
       await loadTrade()
     } catch (err) {
@@ -181,10 +172,10 @@ export default function TradeDetails() {
       try {
         await tradesDb.delete(trade.id)
         
-        // Trigger auto-sync after deleting trade
-        console.log('🔄 Trade deleted, triggering auto-sync...')
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
+        // Trigger immediate sync after deleting trade
+        console.log('🔄 Trade deleted, triggering immediate sync...')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
         
         router.push('/trades')
       } catch (err) {

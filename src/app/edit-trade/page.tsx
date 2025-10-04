@@ -229,6 +229,16 @@ export default function EditTrade() {
       })
 
       setEntryReasons(prev => [...prev, newReason])
+      
+      // Trigger immediate sync after creating entry reason
+      console.log('🔄 Entry reason created, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating entry reason')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after creating entry reason:', syncError)
+      }
       handleInputChange('entry_reason', newReason.id)
       setCustomEntryReason('')
       setShowCustomEntryReason(false)
@@ -262,6 +272,16 @@ export default function EditTrade() {
       })
 
       setEmotionalStates(prev => [...prev, newState])
+      
+      // Trigger immediate sync after creating emotional state
+      console.log('🔄 Emotional state created, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating emotional state')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after creating emotional state:', syncError)
+      }
       handleInputChange('emotional_entry', newState.id)
       setCustomEmotionalState('')
       setShowCustomEmotionalState(false)
@@ -303,23 +323,14 @@ export default function EditTrade() {
 
       await tradesDb.update(tradeId!, updatedTrade)
       
-      // Trigger auto-sync after updating trade
-      console.log('🔄 Trade updated, triggering auto-sync...')
+      // Trigger immediate sync after updating trade
+      console.log('🔄 Trade updated, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after trade update')
-        
-        // Notify other tabs about the sync
-        const event = {
-          type: 'DATA_SYNCED',
-          timestamp: Date.now(),
-          message: 'Trade updated and synced'
-        }
-        localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
-        setTimeout(() => localStorage.removeItem('trademaster_sync_event'), 1000)
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after trade update')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after trade update:', syncError)
+        console.error('❌ Immediate sync failed after trade update:', syncError)
       }
       
       router.push('/trades/')

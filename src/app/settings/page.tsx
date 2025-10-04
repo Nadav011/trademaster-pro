@@ -90,6 +90,17 @@ export default function SettingsPage() {
         risk_per_trade_percent: user.risk_per_trade_percent,
         initial_capital_historical: user.initial_capital_historical,
       })
+      
+      // Trigger immediate sync after saving user settings
+      console.log('🔄 User settings saved, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after saving user settings')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after saving user settings:', syncError)
+      }
+      
       setSuccess('הגדרות המשתמש נשמרו בהצלחה')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
@@ -126,14 +137,14 @@ export default function SettingsPage() {
       })
       setNewEntryReason('')
       
-      // Trigger auto-sync after adding entry reason
-      console.log('🔄 Entry reason added, triggering auto-sync...')
+      // Trigger immediate sync after creating entry reason
+      console.log('🔄 Entry reason created, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after adding entry reason')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating entry reason')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after adding entry reason:', syncError)
+        console.error('❌ Immediate sync failed after creating entry reason:', syncError)
       }
       
       await loadData()
@@ -155,14 +166,14 @@ export default function SettingsPage() {
       })
       setNewEmotionalState('')
       
-      // Trigger auto-sync after adding emotional state
-      console.log('🔄 Emotional state added, triggering auto-sync...')
+      // Trigger immediate sync after creating emotional state
+      console.log('🔄 Emotional state created, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after adding emotional state')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating emotional state')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after adding emotional state:', syncError)
+        console.error('❌ Immediate sync failed after creating emotional state:', syncError)
       }
       
       await loadData()
@@ -178,14 +189,14 @@ export default function SettingsPage() {
     try {
       await entryReasonsDb.update(id, { is_active: !isActive })
       
-      // Trigger auto-sync after updating entry reason
-      console.log('🔄 Entry reason updated, triggering auto-sync...')
+      // Trigger immediate sync after updating entry reason
+      console.log('🔄 Entry reason updated, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after updating entry reason')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after updating entry reason')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after updating entry reason:', syncError)
+        console.error('❌ Immediate sync failed after updating entry reason:', syncError)
       }
       
       await loadData()
@@ -199,14 +210,14 @@ export default function SettingsPage() {
     try {
       await emotionalStatesDb.update(id, { is_active: !isActive })
       
-      // Trigger auto-sync after updating emotional state
-      console.log('🔄 Emotional state updated, triggering auto-sync...')
+      // Trigger immediate sync after updating emotional state
+      console.log('🔄 Emotional state updated, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after updating emotional state')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after updating emotional state')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after updating emotional state:', syncError)
+        console.error('❌ Immediate sync failed after updating emotional state:', syncError)
       }
       
       await loadData()
@@ -222,14 +233,14 @@ export default function SettingsPage() {
     try {
       await entryReasonsDb.delete(id)
       
-      // Trigger auto-sync after deleting entry reason
-      console.log('🔄 Entry reason deleted, triggering auto-sync...')
+      // Trigger immediate sync after deleting entry reason
+      console.log('🔄 Entry reason deleted, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after deleting entry reason')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after deleting entry reason')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after deleting entry reason:', syncError)
+        console.error('❌ Immediate sync failed after deleting entry reason:', syncError)
       }
       
       await loadData()
@@ -247,14 +258,14 @@ export default function SettingsPage() {
     try {
       await emotionalStatesDb.delete(id)
       
-      // Trigger auto-sync after deleting emotional state
-      console.log('🔄 Emotional state deleted, triggering auto-sync...')
+      // Trigger immediate sync after deleting emotional state
+      console.log('🔄 Emotional state deleted, triggering immediate sync...')
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after deleting emotional state')
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after deleting emotional state')
       } catch (syncError) {
-        console.error('❌ Auto-sync failed after deleting emotional state:', syncError)
+        console.error('❌ Immediate sync failed after deleting emotional state:', syncError)
       }
       
       await loadData()

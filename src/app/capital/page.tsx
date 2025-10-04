@@ -172,9 +172,10 @@ export default function CapitalManagement() {
 
       await capitalDb.create(capitalData)
       
-      // Trigger auto-sync after creating capital record
-      console.log('🔄 Capital record created, triggering auto-sync...')
-      await triggerAutoSync()
+      // Trigger immediate sync after creating capital record
+      console.log('🔄 Capital record created, triggering immediate sync...')
+      const { performImmediateSync } = await import('@/lib/supabase')
+      await performImmediateSync()
       
       // Reset form
       setFormData({

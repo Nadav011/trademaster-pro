@@ -172,14 +172,14 @@ export default function TradesList() {
       try {
         await tradesDb.delete(trade.id)
         
-        // Trigger auto-sync after deleting trade
-        console.log('🔄 Trade deleted, triggering auto-sync...')
+        // Trigger immediate sync after deleting trade
+        console.log('🔄 Trade deleted, triggering immediate sync...')
         try {
-          const { triggerAutoSync } = await import('@/lib/supabase')
-          await triggerAutoSync()
-          console.log('✅ Auto-sync completed after trade deletion')
+          const { performImmediateSync } = await import('@/lib/supabase')
+          await performImmediateSync()
+          console.log('✅ Immediate sync completed after trade deletion')
         } catch (syncError) {
-          console.error('❌ Auto-sync failed after trade deletion:', syncError)
+          console.error('❌ Immediate sync failed after trade deletion:', syncError)
         }
         
         await loadTrades()

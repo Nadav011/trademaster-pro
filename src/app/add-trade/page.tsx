@@ -158,6 +158,16 @@ export default function AddTrade() {
       })
       
       setEntryReasons(prev => [...prev, newReason])
+      
+      // Trigger immediate sync after creating entry reason
+      console.log('🔄 Entry reason created, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating entry reason')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after creating entry reason:', syncError)
+      }
       setFormData(prev => ({ ...prev, entry_reason: newReason.name }))
       setShowCustomEntryReason(false)
       setCustomEntryReason('')
@@ -189,6 +199,16 @@ export default function AddTrade() {
       })
       
       setEmotionalStates(prev => [...prev, newState])
+      
+      // Trigger immediate sync after creating emotional state
+      console.log('🔄 Emotional state created, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after creating emotional state')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after creating emotional state:', syncError)
+      }
       setFormData(prev => ({ ...prev, emotional_entry: newState.name }))
       setShowCustomEmotionalState(false)
       setCustomEmotionalState('')
@@ -276,8 +296,10 @@ export default function AddTrade() {
         `
         document.body.appendChild(syncNotification)
         
-        await triggerAutoSync()
-        console.log('✅ Auto-sync completed after trade creation')
+        // Use immediate sync for better performance
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after trade creation')
         
         // Update notification
         syncNotification.textContent = 'סינכרון הושלם!'
@@ -285,15 +307,6 @@ export default function AddTrade() {
         setTimeout(() => {
           document.body.removeChild(syncNotification)
         }, 2000)
-        
-        // Notify other tabs about the sync
-        const event = {
-          type: 'DATA_SYNCED',
-          timestamp: Date.now(),
-          message: 'New trade added and synced'
-        }
-        localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
-        setTimeout(() => localStorage.removeItem('trademaster_sync_event'), 1000)
         
       } catch (syncError) {
         console.error('❌ Auto-sync failed after trade creation:', syncError)

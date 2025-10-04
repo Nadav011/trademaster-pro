@@ -57,6 +57,17 @@ export default function DataManagement() {
     try {
       setIsImporting(true)
       await DataManager.importData(importData)
+      
+      // Trigger immediate sync after importing data
+      console.log('🔄 Data imported, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after importing data')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after importing data:', syncError)
+      }
+      
       setMessage({ type: 'success', text: 'הנתונים יובאו בהצלחה! הדף ירענן כעת.' })
       // Update stats after import
       setDataStats(DataManager.getDataStats())
@@ -75,6 +86,17 @@ export default function DataManagement() {
     try {
       setIsClearing(true)
       await DataManager.clearAllData()
+      
+      // Trigger immediate sync after clearing data
+      console.log('🔄 Data cleared, triggering immediate sync...')
+      try {
+        const { performImmediateSync } = await import('@/lib/supabase')
+        await performImmediateSync()
+        console.log('✅ Immediate sync completed after clearing data')
+      } catch (syncError) {
+        console.error('❌ Immediate sync failed after clearing data:', syncError)
+      }
+      
       setMessage({ type: 'success', text: 'כל הנתונים נמחקו בהצלחה! הדף ירענן כעת.' })
       // Update stats after clearing
       setDataStats(DataManager.getDataStats())

@@ -570,9 +570,9 @@ export default function Dashboard() {
           await triggerAutoSync()
           console.log('✅ Auto-sync on page load completed')
           
-          // Start the periodic auto-sync service for multi-device sync
-          console.log('🚀 Starting periodic auto-sync service...')
-          await startAutoSyncService(15000) // Every 15 seconds for better responsiveness
+          // Start the daily auto-sync service for multi-device sync
+          console.log('🚀 Starting daily auto-sync service...')
+          await startAutoSyncService() // Daily sync (24 hours)
           
           // Reload dashboard data after sync
           setTimeout(loadDashboardData, 1000)
@@ -886,10 +886,10 @@ export default function Dashboard() {
                     
                     if (isRunning) {
                       stopAutoSyncService()
-                      alert('סינכרון אוטומטי הופסק')
+                      alert('סינכרון יומי הופסק')
                     } else {
-                      await startAutoSyncService(15000)
-                      alert('סינכרון אוטומטי הופעל (כל 15 שניות)')
+                      await startAutoSyncService()
+                      alert('סינכרון יומי הופעל (פעם ביום)')
                     }
                   } catch (error) {
                     alert(`שגיאה: ${error}`)
