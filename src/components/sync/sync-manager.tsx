@@ -160,8 +160,8 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
       
       if (error) {
         console.error('❌ Download failed:', error)
-        alert(`שגיאה בהורדת נתונים: ${error.message}`)
-        setSyncStatus(prev => ({ ...prev, error: error.message }))
+        alert(`שגיאה בהורדת נתונים: ${error.message || error}`)
+        setSyncStatus(prev => ({ ...prev, error: error.message || 'Download failed' }))
       } else if (data) {
         console.log('📥 Downloaded data:', data)
         

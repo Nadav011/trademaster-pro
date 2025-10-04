@@ -633,6 +633,29 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  try {
+                    const { supabase } = await import('@/lib/supabase')
+                    const { data: { user }, error } = await supabase.auth.getUser()
+                    if (error) {
+                      alert(`שגיאת התחברות: ${error.message}`)
+                    } else if (user) {
+                      alert(`מחובר כ: ${user.email}\nID: ${user.id}`)
+                    } else {
+                      alert('לא מחובר')
+                    }
+                  } catch (error) {
+                    alert(`שגיאה: ${error}`)
+                  }
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">בדוק חיבור</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
                   // Create sample data for testing
                   const sampleTrade = {
                     symbol: 'AAPL',

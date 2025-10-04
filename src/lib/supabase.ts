@@ -85,26 +85,47 @@ export const dataSync = {
   async downloadUserData(userId: string) {
     console.log('🔍 Downloading data for user:', userId)
     
-    // First check if the table exists
-    const { data: tableCheck, error: tableError } = await supabase
-      .from('user_data')
-      .select('count', { count: 'exact', head: true })
-    
-    if (tableError) {
-      console.error('❌ Table check failed:', tableError)
-      return { data: null, error: tableError }
-    }
-    
-    console.log('✅ Table exists, proceeding with download')
-    
-    const { data, error } = await supabase
-      .from('user_data')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
+    try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        console.error('❌ User not authenticated:', authError)
+        return { data: null, error: new Error('User not authenticated') }
+      }
+      
+      console.log('✅ User authenticated:', user.id)
+      
+      // Try to get user data
+      const { data, error } = await supabase
+        .from('user_data')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
 
-    console.log('📥 Download result:', { data, error })
-    return { data, error }
+      console.log('📥 Download result:', { data, error, count: data?.length })
+      
+      if (error) {
+        console.error('❌ Download failed:', error)
+        // Check if it's a table not found error
+        if (error.message?.includes('relation "user_data" does not exist')) {
+          return { data: null, error: new Error('Database table not set up. Please contact support.') }
+        }
+        return { data: null, error }
+      }
+      
+      // If we have data, return the most recent record
+      if (data && data.length > 0) {
+        const mostRecentData = data[0]
+        console.log('✅ Found user data:', mostRecentData)
+        return { data: mostRecentData, error: null }
+      } else {
+        console.log('⚠️ No data found for user')
+        return { data: null, error: null }
+      }
+    } catch (error) {
+      console.error('❌ Download error:', error)
+      return { data: null, error: error instanceof Error ? error : new Error('Download failed') }
+    }
   },
 
   async deleteUserData(userId: string) {
