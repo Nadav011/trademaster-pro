@@ -13,7 +13,7 @@ import {
   Clock,
   HardDrive
 } from 'lucide-react'
-import { tradeDatabase, capitalDatabase } from '@/lib/database-client'
+import { tradeDatabase, capitalDatabase, tradesDb, capitalDb } from '@/lib/database-client'
 import { formatDate } from '@/lib/utils'
 
 interface SyncManagerProps {
@@ -47,7 +47,7 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
   const loadDataStatus = async () => {
     try {
       const trades = await tradeDatabase.findAll()
-      const capital = await capitalDatabase.findAll()
+      const capital = await capitalDatabase.getCapitalHistory()
       
       setDataStatus({
         tradesCount: trades.length,
@@ -65,7 +65,7 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
     setIsLoading(true)
     try {
       const trades = await tradeDatabase.findAll()
-      const capital = await capitalDatabase.findAll()
+      const capital = await capitalDatabase.getCapitalHistory()
       
       const exportData = {
         trades,
@@ -111,15 +111,15 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
         if (importData.trades && importData.capital) {
           // Clear existing data
           const existingTrades = await tradeDatabase.findAll()
-          const existingCapital = await capitalDatabase.findAll()
+          const existingCapital = await capitalDatabase.getCapitalHistory()
           
           // Import new data
           for (const trade of importData.trades) {
-            await tradeDatabase.create(trade)
+            await tradesDb.create(trade)
           }
           
           for (const capital of importData.capital) {
-            await capitalDatabase.create(capital)
+            await capitalDb.create(capital)
           }
           
           await loadDataStatus()

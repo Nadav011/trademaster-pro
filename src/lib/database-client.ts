@@ -1,7 +1,7 @@
 // TradeMaster Pro - Client-Side Database System
 // Browser-compatible database using localStorage
 
-import { Trade, Capital, EntryReason, EmotionalState, User, ApiResponse } from '@/types';
+import { Trade, Capital, EntryReason, EmotionalState, User, ApiResponse, CapitalSummary } from '@/types';
 import { generateId } from '@/lib/utils';
 
 // Generic database operations for browser
@@ -279,7 +279,7 @@ export const capitalDatabase = {
       realized_pnl: realizedPnl,
       unrealized_pnl: unrealizedPnl,
       total_equity: totalEquity,
-      last_reconciliation_date: lastReconciliation?.actual_datetime || null
+      last_reconciliation_date: lastReconciliation?.actual_datetime
     };
   },
 
@@ -290,18 +290,22 @@ export const capitalDatabase = {
 
   async importData(data: Capital[]): Promise<void> {
     // Clear existing data
-    const allItems = capitalDb.readData();
-    allItems.forEach(item => capitalDb.delete(item.id));
+    const allItems = await capitalDb.findAll();
+    for (const item of allItems) {
+      await capitalDb.delete(item.id);
+    }
     
     // Import new data
-    data.forEach(item => {
-      capitalDb.create(item);
-    });
+    for (const item of data) {
+      await capitalDb.create(item);
+    }
   },
 
   async clearAll(): Promise<void> {
-    const allItems = capitalDb.readData();
-    allItems.forEach(item => capitalDb.delete(item.id));
+    const allItems = await capitalDb.findAll();
+    for (const item of allItems) {
+      await capitalDb.delete(item.id);
+    }
   },
 };
 
@@ -361,23 +365,27 @@ export const calculateTradeMetrics = {
 
   // Import/Export functions for sync
   async exportData(): Promise<Trade[]> {
-    return this.findAll();
+    return tradeDatabase.findAll();
   },
 
   async importData(data: Trade[]): Promise<void> {
     // Clear existing data
-    const allItems = this.readData();
-    allItems.forEach(item => this.delete(item.id));
+    const allItems = await tradeDatabase.findAll();
+    for (const item of allItems) {
+      await tradesDb.delete(item.id);
+    }
     
     // Import new data
-    data.forEach(item => {
-      this.create(item);
-    });
+    for (const item of data) {
+      await tradesDb.create(item);
+    }
   },
 
   async clearAll(): Promise<void> {
-    const allItems = this.readData();
-    allItems.forEach(item => this.delete(item.id));
+    const allItems = await tradeDatabase.findAll();
+    for (const item of allItems) {
+      await tradesDb.delete(item.id);
+    }
   },
 };
 

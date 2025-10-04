@@ -9,6 +9,8 @@ export interface Trade {
   position_size: number;
   entry_price: number;
   exit_price?: number;
+  exit_datetime?: string; // ISO string - when trade was closed
+  current_price?: number; // Current market price for open trades
   risk_level: 1 | 2 | 3; // 1=low, 2=medium, 3=high
   planned_stop_loss: number;
   entry_reason: string; // Reference to EntryReason
@@ -36,6 +38,14 @@ export interface Capital {
   type: 'Initial' | 'Deposit' | 'Withdrawal' | 'Reconciliation';
   notes?: string;
   created_at: string; // ISO string
+}
+
+export interface CapitalSummary {
+  base_capital: number;
+  realized_pnl: number;
+  unrealized_pnl: number;
+  total_equity: number;
+  last_reconciliation_date?: string;
 }
 
 export interface EntryReason {
