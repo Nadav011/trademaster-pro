@@ -217,15 +217,26 @@ export class SyncManager {
       
       if (cloudData) {
         console.log('🔄 Merging cloud data with local data...')
+        console.log('📊 Cloud data summary:', {
+          trades: cloudData.trades?.length || 0,
+          capital: cloudData.capital?.length || 0
+        })
+        console.log('📊 Local data summary:', {
+          trades: localTrades.length,
+          capital: localCapital.length
+        })
         
         // Merge trades
         const cloudTrades = cloudData.trades || []
         const localTradeIds = new Set(localTrades.map(t => t.id))
         
+        console.log('🔍 Checking for new trades from cloud...')
+        let newTradesAdded = 0
         for (const cloudTrade of cloudTrades) {
           if (!localTradeIds.has(cloudTrade.id)) {
-            console.log('➕ Adding new trade from cloud:', cloudTrade.id)
+            console.log('➕ Adding new trade from cloud:', cloudTrade.id, cloudTrade.symbol)
             await tradesDb.create(cloudTrade)
+            newTradesAdded++
           }
         }
         
@@ -233,14 +244,20 @@ export class SyncManager {
         const cloudCapital = cloudData.capital || []
         const localCapitalIds = new Set(localCapital.map(c => c.id))
         
+        console.log('🔍 Checking for new capital records from cloud...')
+        let newCapitalAdded = 0
         for (const cloudCapitalRecord of cloudCapital) {
           if (!localCapitalIds.has(cloudCapitalRecord.id)) {
             console.log('➕ Adding new capital record from cloud:', cloudCapitalRecord.id)
             await capitalDb.create(cloudCapitalRecord)
+            newCapitalAdded++
           }
         }
         
-        console.log('✅ Auto-sync completed - merged data')
+        console.log('✅ Auto-sync completed - merged data:', {
+          newTradesAdded,
+          newCapitalAdded
+        })
       } else {
         console.log('✅ Auto-sync completed - no cloud data to merge')
       }

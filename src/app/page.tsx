@@ -672,6 +672,36 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  try {
+                    const { dataSync } = await import('@/lib/supabase')
+                    const { supabase } = await import('@/lib/supabase')
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (!user) {
+                      alert('לא מחובר')
+                      return
+                    }
+                    
+                    const { data, error } = await dataSync.downloadUserData(user.id)
+                    if (error) {
+                      alert(`שגיאה: ${error.message}`)
+                    } else if (data) {
+                      alert(`נתונים בענן:\nעסקאות: ${data.trades?.length || 0}\nרשומות הון: ${data.capital?.length || 0}`)
+                    } else {
+                      alert('אין נתונים בענן')
+                    }
+                  } catch (error) {
+                    alert(`שגיאה: ${error}`)
+                  }
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">בדוק ענן</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
                   // Create sample data for testing
                   const sampleTrade = {
                     symbol: 'AAPL',
@@ -720,6 +750,7 @@ export default function Dashboard() {
                   try {
                     const { triggerAutoSync } = await import('@/lib/supabase')
                     console.log('🔄 Manual sync triggered...')
+                    alert('מבצע סינכרון... אנא המתן')
                     await triggerAutoSync()
                     // Reload dashboard data after sync
                     setTimeout(loadDashboardData, 1000)
