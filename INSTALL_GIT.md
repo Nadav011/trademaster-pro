@@ -68,3 +68,4 @@ git push -u origin main
 ---
 
 **התקן את Git ואז המשך עם הפריסה! 🎯**
+
