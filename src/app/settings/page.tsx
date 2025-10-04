@@ -24,6 +24,7 @@ import {
   emotionalStatesDb,
   initializeDatabase 
 } from '@/lib/database-client'
+import { SyncManagerComponent } from '@/components/sync/sync-manager'
 import { 
   User as UserType,
   EntryReason, 
@@ -495,6 +496,14 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Cloud Sync */}
+          <SyncManagerComponent 
+            onSyncComplete={() => {
+              // Refresh data after sync
+              loadData()
+            }}
+          />
         </div>
       </main>
     </div>

@@ -41,63 +41,122 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [liveStockSymbols, setLiveStockSymbols] = useState<string[]>([])
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false)
+  const [priceCache, setPriceCache] = useState<Map<string, { data: any, timestamp: number }>>(new Map())
+
+  // Function to close a trade
+  const handleCloseTrade = async (tradeId: string) => {
+    try {
+      // Navigate to trade details page to close the trade
+      window.location.href = `/trades/${tradeId}`
+    } catch (error) {
+      console.error('Failed to navigate to trade:', error)
+    }
+  }
 
   const loadCurrentPrices = async (trades: Trade[]) => {
     try {
+      setIsLoadingPrices(true)
       const symbols = [...new Set(trades.map(trade => trade.symbol))]
-      if (symbols.length === 0) return
+      if (symbols.length === 0) {
+        setIsLoadingPrices(false)
+        return
+      }
 
-      // Get current prices for all symbols
-      const prices = await Promise.all(
-        symbols.map(async (symbol) => {
+      // Check cache first and filter symbols that need fresh data
+      const now = Date.now()
+      const cacheTimeout = 60 * 1000 // 1 minute cache
+      
+      const symbolsToFetch = symbols.filter(symbol => {
+        const cached = priceCache.get(symbol)
+        return !cached || (now - cached.timestamp) > cacheTimeout
+      })
+
+      console.log(`📊 Fetching prices for ${symbolsToFetch.length} symbols (${symbols.length - symbolsToFetch.length} from cache)`)
+
+      // Get fresh prices only for symbols not in cache
+      const freshPrices = symbolsToFetch.length > 0 ? await Promise.allSettled(
+        symbolsToFetch.map(async (symbol) => {
           try {
-            const marketData = await finnhubAPI.getQuote(symbol)
+            // Add timeout to prevent hanging
+            const marketData = await Promise.race([
+              finnhubAPI.getQuote(symbol),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+              )
+            ])
             return { symbol, data: marketData }
           } catch (error) {
             console.error(`Failed to get price for ${symbol}:`, error)
             return { symbol, data: null }
           }
         })
-      )
+      ).then(results => 
+        results.map(result => 
+          result.status === 'fulfilled' ? result.value : { symbol: 'unknown', data: null }
+        )
+      ) : []
 
-      // Update open trades with current prices
-      const updatedTrades = prevTrades.map(trade => {
-        const priceData = prices.find(p => p.symbol === trade.symbol)
-        if (!priceData?.data) return trade
-
-        const currentPrice = priceData.data.price
-        const entryPrice = trade.entry_price
-        const positionSize = trade.position_size
-        const direction = trade.direction
-
-        // Calculate unrealized P&L
-        let unrealizedPnl = 0
-        if (direction === 'Long') {
-          unrealizedPnl = (currentPrice - entryPrice) * positionSize
-        } else {
-          unrealizedPnl = (entryPrice - currentPrice) * positionSize
-        }
-
-        // Calculate R units
-        const riskPerShare = Math.abs(entryPrice - trade.planned_stop_loss)
-        const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * positionSize) : 0
-
-        return {
-          ...trade,
-          current_price: currentPrice,
-          daily_change: priceData.data.change,
-          unrealized_pnl: unrealizedPnl,
-          unrealized_r_units: unrealizedRUnits,
-          unrealized_percentage: ((currentPrice - entryPrice) / entryPrice) * 100,
+      // Update cache with fresh prices
+      const newCache = new Map(priceCache)
+      freshPrices.forEach(priceData => {
+        if (priceData.data) {
+          newCache.set(priceData.symbol, { data: priceData.data, timestamp: now })
         }
       })
+      setPriceCache(newCache)
 
-      setOpenTrades(updatedTrades)
-      
-      // Recalculate KPIs with updated prices
-      recalculateKPIsWithUpdatedPrices(updatedTrades)
+      // Combine cached and fresh prices
+      const allPrices = symbols.map(symbol => {
+        const cached = newCache.get(symbol)
+        if (cached) {
+          return { symbol, data: cached.data }
+        }
+        const fresh = freshPrices.find(p => p.symbol === symbol)
+        return fresh || { symbol, data: null }
+      })
+
+      // Update open trades with current prices
+      setOpenTrades(prevTrades => {
+        const updatedTrades = prevTrades.map(trade => {
+          const priceData = allPrices.find(p => p.symbol === trade.symbol)
+          if (!priceData?.data) return trade
+
+          const currentPrice = priceData.data.price
+          const entryPrice = trade.entry_price
+          const positionSize = trade.position_size
+          const direction = trade.direction
+
+          // Calculate unrealized P&L
+          let unrealizedPnl = 0
+          if (direction === 'Long') {
+            unrealizedPnl = (currentPrice - entryPrice) * positionSize
+          } else {
+            unrealizedPnl = (entryPrice - currentPrice) * positionSize
+          }
+
+          // Calculate R units
+          const riskPerShare = Math.abs(entryPrice - trade.planned_stop_loss)
+          const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * positionSize) : 0
+
+          return {
+            ...trade,
+            current_price: currentPrice,
+            daily_change: priceData.data.change,
+            unrealized_pnl: unrealizedPnl,
+            unrealized_r_units: unrealizedRUnits,
+            unrealized_percentage: ((currentPrice - entryPrice) / entryPrice) * 100,
+          }
+        })
+
+        // Recalculate KPIs with updated prices
+        recalculateKPIsWithUpdatedPrices(updatedTrades)
+        return updatedTrades
+      })
     } catch (error) {
       console.error('Failed to load current prices:', error)
+    } finally {
+      setIsLoadingPrices(false)
     }
   }
 
@@ -174,14 +233,23 @@ export default function Dashboard() {
 
       const weeklyChangeDollars = weeklyProfitLossClosed + weeklyProfitLossOpen
       
-      // Calculate daily change percentage based on total portfolio value
-      const totalPortfolioValue = totalProfitLossClosed + (updatedOpenTrades.length * 1000) // Estimate
-      const dailyChangePercent = totalPortfolioValue > 0 
-        ? (dailyChangeDollars / totalPortfolioValue) * 100 
+      // Get total current capital for percentage calculations
+      let totalCurrentCapital = 0
+      try {
+        const capitalSummary = await capitalDatabase.getCapitalSummary()
+        totalCurrentCapital = capitalSummary.total_equity
+      } catch (error) {
+        console.error('Failed to get capital summary:', error)
+        // Fallback: estimate based on own capital + P&L
+        totalCurrentCapital = totalProfitLossClosed + (updatedOpenTrades.length * 1000)
+      }
+      
+      const dailyChangePercent = totalCurrentCapital > 0 
+        ? (dailyChangeDollars / totalCurrentCapital) * 100 
         : 0
       
-      const weeklyChangePercent = totalPortfolioValue > 0 
-        ? (weeklyChangeDollars / totalPortfolioValue) * 100 
+      const weeklyChangePercent = totalCurrentCapital > 0 
+        ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
 
       // Calculate open trades P&L with updated prices
@@ -222,6 +290,7 @@ export default function Dashboard() {
     try {
       setIsLoading(true)
       setError(null)
+      console.log('🚀 Loading dashboard data...')
 
       // Initialize database if needed
       await initializeDatabase()
@@ -319,25 +388,50 @@ export default function Dashboard() {
 
       const weeklyChangeDollars = weeklyProfitLossClosed + weeklyProfitLossOpen
       
-      // Calculate daily change percentage based on total portfolio value
-      // For now, we'll use a simple calculation - this could be improved with actual portfolio value
-      const totalPortfolioValue = totalProfitLossClosed + (openTrades.length * 1000) // Estimate
-      const dailyChangePercent = totalPortfolioValue > 0 
-        ? (dailyChangeDollars / totalPortfolioValue) * 100 
+      // Get total current capital for percentage calculations
+      let totalCurrentCapital = 0
+      try {
+        const capitalSummary = await capitalDatabase.getCapitalSummary()
+        totalCurrentCapital = capitalSummary.total_equity
+      } catch (error) {
+        console.error('Failed to get capital summary:', error)
+        // Fallback: estimate based on own capital + P&L
+        totalCurrentCapital = totalProfitLossClosed + (openTrades.length * 1000)
+      }
+      
+      const dailyChangePercent = totalCurrentCapital > 0 
+        ? (dailyChangeDollars / totalCurrentCapital) * 100 
         : 0
       
-      const weeklyChangePercent = totalPortfolioValue > 0 
-        ? (weeklyChangeDollars / totalPortfolioValue) * 100 
+      const weeklyChangePercent = totalCurrentCapital > 0 
+        ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
 
       // Calculate open trades P&L - FIXED: Now properly calculates for all open trades
       const totalProfitLossOpen = openTrades.reduce((sum, trade) => {
+        // Use current_price if available, otherwise use entry_price
         const currentPrice = trade.current_price || trade.entry_price
         const profitLoss = trade.direction === 'Long' 
           ? (currentPrice - trade.entry_price) * trade.position_size
           : (trade.entry_price - currentPrice) * trade.position_size
         return sum + profitLoss
       }, 0)
+
+      console.log('🔍 Open trades P&L calculation:')
+      console.log('Open trades count:', openTrades.length)
+      openTrades.forEach((trade, index) => {
+        console.log(`Trade ${index + 1}:`, {
+          symbol: trade.symbol,
+          direction: trade.direction,
+          entry_price: trade.entry_price,
+          current_price: trade.current_price,
+          position_size: trade.position_size,
+          calculated_pnl: trade.direction === 'Long' 
+            ? ((trade.current_price || trade.entry_price) - trade.entry_price) * trade.position_size
+            : (trade.entry_price - (trade.current_price || trade.entry_price)) * trade.position_size
+        })
+      })
+      console.log('Total profit/loss open:', totalProfitLossOpen)
 
       const winRate = totalTradesForWinRate > 0 
         ? (totalWinningTrades / totalTradesForWinRate) * 100 
@@ -386,8 +480,11 @@ export default function Dashboard() {
       setOpenTrades(openTradesWithCalculations)
 
       // Load current prices for open trades (only if API key is configured)
+      // Don't await this - let it load in background
       if (openTradesData.length > 0 && finnhubApiKey) {
-        await loadCurrentPrices(openTradesData)
+        loadCurrentPrices(openTradesData).catch(error => {
+          console.error('Background price loading failed:', error)
+        })
       }
 
       // Extract unique symbols from open trades for live stocks
@@ -399,16 +496,32 @@ export default function Dashboard() {
       setError('שגיאה בטעינת נתוני הדאשבורד')
     } finally {
       setIsLoading(false)
+      console.log('✅ Dashboard data loaded successfully')
     }
   }
 
   useEffect(() => {
     loadDashboardData()
     
-    // Auto-refresh dashboard data every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000)
+    // Auto-refresh dashboard data every 5 minutes
+    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
     
-    return () => clearInterval(interval)
+    // Auto-refresh prices every 2 minutes (reduced frequency for better performance)
+    const priceInterval = setInterval(async () => {
+      const openTradesData = await tradeDatabase.getOpenTrades()
+      const finnhubApiKey = apiConfig.getFinnhubApiKey()
+      if (openTradesData.length > 0 && finnhubApiKey) {
+        console.log('🔄 Auto-refreshing prices...')
+        loadCurrentPrices(openTradesData).catch(error => {
+          console.error('Auto-refresh failed:', error)
+        })
+      }
+    }, 2 * 60 * 1000)
+    
+    return () => {
+      clearInterval(interval)
+      clearInterval(priceInterval)
+    }
   }, [])
 
   const handleTradeUpdate = (updatedTrades: TradeWithCalculations[]) => {
@@ -490,7 +603,12 @@ export default function Dashboard() {
           />
 
           {/* Open Trades */}
-          <OpenTrades trades={openTrades} isLoading={isLoading} />
+          <OpenTrades 
+            trades={openTrades} 
+            isLoading={isLoading}
+            isLoadingPrices={isLoadingPrices}
+            onCloseTrade={handleCloseTrade}
+          />
 
           {/* Additional Dashboard Sections */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

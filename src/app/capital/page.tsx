@@ -18,6 +18,7 @@ import {
   BarChart3,
   AlertCircle
 } from 'lucide-react'
+import { CapitalChart } from '@/components/capital/capital-chart'
 import { 
   capitalDb, 
   tradeDatabase,
@@ -59,6 +60,11 @@ export default function CapitalManagement() {
 
   useEffect(() => {
     loadCapitalData()
+    
+    // Auto-refresh capital data every 5 minutes
+    const interval = setInterval(loadCapitalData, 5 * 60 * 1000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const loadCapitalData = async () => {
@@ -90,23 +96,30 @@ export default function CapitalManagement() {
         sum + (trade.result_dollars || 0), 0
       )
 
-      // Calculate unrealized P&L from open trades
+      // Calculate unrealized P&L from open trades AFTER last reconciliation
       let unrealizedPnl = 0
       if (trades.length > 0) {
-        const symbols = [...new Set(trades.map(trade => trade.symbol))]
-        const marketData = await marketDataUtils.getCurrentPrices(symbols)
+        // Filter open trades to only those opened AFTER last reconciliation
+        const openTradesAfterReconciliation = trades.filter(trade => 
+          new Date(trade.datetime) > lastReconciliationDate
+        )
         
-        unrealizedPnl = trades.reduce((sum, trade) => {
-          const currentData = marketData[trade.symbol]
-          if (!currentData) return sum
+        if (openTradesAfterReconciliation.length > 0) {
+          const symbols = [...new Set(openTradesAfterReconciliation.map(trade => trade.symbol))]
+          const marketData = await marketDataUtils.getCurrentPrices(symbols)
           
-          const currentPrice = currentData.price
-          const unrealizedPnl = trade.direction === 'Long' 
-            ? (currentPrice - trade.entry_price) * trade.position_size
-            : (trade.entry_price - currentPrice) * trade.position_size
-          
-          return sum + unrealizedPnl
-        }, 0)
+          unrealizedPnl = openTradesAfterReconciliation.reduce((sum, trade) => {
+            const currentData = marketData[trade.symbol]
+            if (!currentData) return sum
+            
+            const currentPrice = currentData.price
+            const unrealizedPnl = trade.direction === 'Long' 
+              ? (currentPrice - trade.entry_price) * trade.position_size
+              : (trade.entry_price - currentPrice) * trade.position_size
+            
+            return sum + unrealizedPnl
+          }, 0)
+        }
       }
 
       const summary: CapitalSummary = {
@@ -256,7 +269,7 @@ export default function CapitalManagement() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {capitalSummary.last_reconciliation_date 
                     ? `התאמה אחרונה: ${formatDate(capitalSummary.last_reconciliation_date)}`
-                    : 'אין התאמה אחרונה'
+                    : 'אין התאמה אחרונה - כל העסקאות נחשבות'
                   }
                 </p>
               </CardContent>
@@ -276,6 +289,12 @@ export default function CapitalManagement() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   מעסקאות סגורות
                 </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {capitalSummary.last_reconciliation_date 
+                    ? 'רק עסקאות שנסגרו אחרי ההתאמה האחרונה'
+                    : 'כל העסקאות הסגורות'
+                  }
+                </p>
               </CardContent>
             </Card>
 
@@ -291,7 +310,20 @@ export default function CapitalManagement() {
                   {formatCurrency(capitalSummary.unrealized_pnl)}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {openTrades.length} עסקאות פתוחות
+                  {openTrades.length > 0 ? 
+                    openTrades.filter(trade => 
+                      !capitalSummary.last_reconciliation_date || 
+                      new Date(trade.datetime) > new Date(capitalSummary.last_reconciliation_date)
+                    ).length + 
+                    ' מתוך ' + openTrades.length + ' עסקאות פתוחות' : 
+                    'אין עסקאות פתוחות'
+                  }
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {capitalSummary.last_reconciliation_date 
+                    ? 'רק עסקאות שנפתחו אחרי ההתאמה האחרונה'
+                    : 'כל העסקאות הפתוחות'
+                  }
                 </p>
               </CardContent>
             </Card>
@@ -454,28 +486,8 @@ export default function CapitalManagement() {
             </CardContent>
           </Card>
 
-          {/* Capital Growth Chart Placeholder */}
-          <Card className="apple-card">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 space-x-reverse">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-                <span>גרף התפתחות הון</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                <div className="text-center">
-                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    גרף התפתחות הון יוצג כאן
-                  </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    נדרש להגדיר Recharts
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Capital Growth Chart */}
+          <CapitalChart capitalHistory={capitalHistory} />
         </div>
       </main>
     </div>

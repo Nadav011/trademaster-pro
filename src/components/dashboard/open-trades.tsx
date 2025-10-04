@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { TrendingUp, TrendingDown, ExternalLink, RefreshCw, Clock, Target, DollarSign } from 'lucide-react'
+import { TrendingUp, TrendingDown, ExternalLink, RefreshCw, Clock, Target, DollarSign, X } from 'lucide-react'
 import Link from 'next/link'
 import { TradeWithCalculations } from '@/types'
 import { formatCurrency, formatDate, getProfitLossColor } from '@/lib/utils'
@@ -11,9 +11,11 @@ import { formatCurrency, formatDate, getProfitLossColor } from '@/lib/utils'
 interface OpenTradesProps {
   trades: TradeWithCalculations[]
   isLoading?: boolean
+  isLoadingPrices?: boolean
+  onCloseTrade?: (tradeId: string) => void
 }
 
-export function OpenTrades({ trades, isLoading = false }: OpenTradesProps) {
+export function OpenTrades({ trades, isLoading = false, isLoadingPrices = false, onCloseTrade }: OpenTradesProps) {
   if (isLoading) {
     return (
       <Card className="apple-card">
@@ -107,6 +109,12 @@ export function OpenTrades({ trades, isLoading = false }: OpenTradesProps) {
           <CardTitle className="flex items-center space-x-2 space-x-reverse">
             <TrendingUp className="h-5 w-5 text-blue-600" />
             <span>עסקאות פתוחות</span>
+            {isLoadingPrices && (
+              <div className="flex items-center space-x-1 space-x-reverse text-xs text-blue-600">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>מעדכן מחירים...</span>
+              </div>
+            )}
           </CardTitle>
           <div className="flex items-center space-x-2 space-x-reverse">
             <Link href="/trades">
@@ -230,13 +238,26 @@ export function OpenTrades({ trades, isLoading = false }: OpenTradesProps) {
                       </div>
                     </div>
 
-                    {/* Action Button */}
-                    <div className="mt-3">
-                      <Link href={`/trades/${trade.id}`}>
-                        <Button variant="outline" size="sm" className="w-full">
-                          צפה בפרטים
-                        </Button>
-                      </Link>
+                    {/* Action Buttons */}
+                    <div className="mt-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Link href={`/trades/${trade.id}`}>
+                          <Button variant="outline" size="sm" className="w-full text-xs">
+                            צפה בפרטים
+                          </Button>
+                        </Link>
+                        {onCloseTrade && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            onClick={() => onCloseTrade(trade.id)}
+                          >
+                            <X className="h-3 w-3 ml-1" />
+                            סגור
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

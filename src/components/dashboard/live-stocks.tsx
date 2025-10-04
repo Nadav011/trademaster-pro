@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, RefreshCw, Wifi, WifiOff, DollarSign } from 'lucide-react'
+import Link from 'next/link'
 import { marketDataUtils } from '@/lib/database-client'
 import { MarketData, Trade, TradeWithCalculations } from '@/types'
 import { formatCurrency, getProfitLossColor } from '@/lib/utils'
@@ -180,18 +181,20 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
               const stock = stocks[symbol]
               if (!stock) {
                 return (
-                  <Card key={symbol} className="apple-card border-2 border-gray-200 dark:border-gray-700">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3 space-x-reverse mb-3">
-                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                        <div className="font-bold text-lg">{symbol}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-400 mb-2">טוען...</div>
-                        <div className="text-sm text-gray-500">מחיר נוכחי</div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Link key={symbol} href={`/trades?symbol=${symbol}`}>
+                    <Card className="apple-card border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3 space-x-reverse mb-3">
+                          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                          <div className="font-bold text-lg">{symbol}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-400 mb-2">טוען...</div>
+                          <div className="text-sm text-gray-500">מחיר נוכחי</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 )
               }
 
@@ -199,11 +202,12 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
               const hasPosition = tradeProfit.totalShares > 0
 
               return (
-                <Card key={symbol} className={`apple-card border-2 transition-all duration-200 hover:shadow-lg ${
-                  stock.change > 0 ? 'border-green-200 dark:border-green-800' : 
-                  stock.change < 0 ? 'border-red-200 dark:border-red-800' : 
-                  'border-gray-200 dark:border-gray-700'
-                }`}>
+                <Link key={symbol} href={`/trades?symbol=${symbol}`}>
+                  <Card className={`apple-card border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${
+                    stock.change > 0 ? 'border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700' : 
+                    stock.change < 0 ? 'border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700' : 
+                    'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}>
                   <CardContent className="p-4">
                     {/* Header with symbol and icon */}
                     <div className="flex items-center space-x-3 space-x-reverse mb-3">
@@ -280,7 +284,8 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                  </Card>
+                </Link>
               )
             })}
           </div>

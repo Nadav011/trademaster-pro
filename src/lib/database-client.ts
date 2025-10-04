@@ -152,6 +152,9 @@ export const initializeDatabase = async () => {
       initial_capital_historical: 10000,
     });
   }
+
+  // Note: We don't initialize demo data anymore - we preserve existing user data
+  // Only initialize default entry reasons and emotional states if none exist
 };
 
 // Trade-specific database operations
@@ -221,6 +224,74 @@ export const capitalDatabase = {
     
     return lastReconciliation.amount;
   },
+
+  async getCapitalSummary(): Promise<CapitalSummary> {
+    const allCapital = await capitalDb.findAll();
+    const lastReconciliation = await this.getLastReconciliation();
+    
+    const baseCapital = lastReconciliation ? lastReconciliation.amount : 0;
+    
+    // Calculate realized P&L from trades
+    const trades = await tradeDatabase.findAll();
+    const closedTrades = trades.filter(trade => trade.exit_price);
+    
+    let realizedPnl = 0;
+    if (closedTrades.length > 0) {
+      // Filter trades based on last reconciliation date
+      const reconciliationDate = lastReconciliation 
+        ? new Date(lastReconciliation.actual_datetime) 
+        : new Date(0);
+      
+      const tradesAfterReconciliation = closedTrades.filter(trade => 
+        new Date(trade.datetime) > reconciliationDate
+      );
+      
+      realizedPnl = tradesAfterReconciliation.reduce((sum, trade) => 
+        sum + (trade.result_dollars || 0), 0
+      );
+    }
+    
+    // Calculate unrealized P&L from open trades
+    const openTrades = trades.filter(trade => !trade.exit_price);
+    let unrealizedPnl = 0;
+    
+    if (openTrades.length > 0) {
+      // This would need current market prices
+      // For now, we'll return 0 for unrealized P&L
+      unrealizedPnl = 0;
+    }
+    
+    const totalEquity = baseCapital + realizedPnl + unrealizedPnl;
+    
+    return {
+      base_capital: baseCapital,
+      realized_pnl: realizedPnl,
+      unrealized_pnl: unrealizedPnl,
+      total_equity: totalEquity,
+      last_reconciliation_date: lastReconciliation?.actual_datetime || null
+    };
+  },
+
+  // Import/Export functions for sync
+  async exportData(): Promise<Capital[]> {
+    return capitalDb.findAll();
+  },
+
+  async importData(data: Capital[]): Promise<void> {
+    // Clear existing data
+    const allItems = capitalDb.readData();
+    allItems.forEach(item => capitalDb.delete(item.id));
+    
+    // Import new data
+    data.forEach(item => {
+      capitalDb.create(item);
+    });
+  },
+
+  async clearAll(): Promise<void> {
+    const allItems = capitalDb.readData();
+    allItems.forEach(item => capitalDb.delete(item.id));
+  },
 };
 
 // Utility functions for calculations
@@ -275,6 +346,27 @@ export const calculateTradeMetrics = {
       : entryPrice - exitPrice;
     
     return (priceDiff / entryPrice) * 100;
+  },
+
+  // Import/Export functions for sync
+  async exportData(): Promise<Trade[]> {
+    return this.findAll();
+  },
+
+  async importData(data: Trade[]): Promise<void> {
+    // Clear existing data
+    const allItems = this.readData();
+    allItems.forEach(item => this.delete(item.id));
+    
+    // Import new data
+    data.forEach(item => {
+      this.create(item);
+    });
+  },
+
+  async clearAll(): Promise<void> {
+    const allItems = this.readData();
+    allItems.forEach(item => this.delete(item.id));
   },
 };
 
