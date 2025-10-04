@@ -548,6 +548,22 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboardData()
     
+    // Auto-sync on page load
+    const autoSyncOnLoad = async () => {
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        console.log('🔄 Auto-syncing on page load...')
+        await triggerAutoSync()
+        // Reload dashboard data after sync
+        setTimeout(loadDashboardData, 1000)
+      } catch (error) {
+        console.error('Auto-sync on load failed:', error)
+      }
+    }
+    
+    // Run auto-sync after a short delay to ensure page is loaded
+    setTimeout(autoSyncOnLoad, 2000)
+    
     // Auto-refresh dashboard data every 5 minutes
     const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
     
@@ -696,6 +712,27 @@ export default function Dashboard() {
               >
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">נתונים לדוגמה</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const { triggerAutoSync } = await import('@/lib/supabase')
+                    console.log('🔄 Manual sync triggered...')
+                    await triggerAutoSync()
+                    // Reload dashboard data after sync
+                    setTimeout(loadDashboardData, 1000)
+                    alert('סינכרון הושלם בהצלחה!')
+                  } catch (error) {
+                    console.error('Manual sync failed:', error)
+                    alert(`שגיאה בסינכרון: ${error}`)
+                  }
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">סנכרן</span>
               </Button>
               <Button
                 variant="outline"

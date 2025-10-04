@@ -189,23 +189,65 @@ export class SyncManager {
       console.log('🔄 Auto-syncing data...')
       
       // Import the database client
-      const { tradeDatabase, capitalDatabase } = await import('./database-client')
+      const { tradeDatabase, capitalDatabase, tradesDb, capitalDb } = await import('./database-client')
       
-      // Get current data
-      const trades = await tradeDatabase.findAll()
-      const capital = await capitalDatabase.getCapitalHistory()
+      // Get current local data
+      const localTrades = await tradeDatabase.findAll()
+      const localCapital = await capitalDatabase.getCapitalHistory()
       
-      // Upload to Supabase
-      const { error } = await dataSync.uploadUserData(user.id, trades, capital)
+      // Upload local data to Supabase
+      console.log('📤 Uploading local data...')
+      const { error: uploadError } = await dataSync.uploadUserData(user.id, localTrades, localCapital)
       
-      if (error) {
-        console.error('Auto-sync failed:', error)
-        this.syncStatus.error = error.message
-      } else {
-        console.log('✅ Auto-sync successful')
-        this.syncStatus.lastSync = new Date()
-        this.syncStatus.error = null
+      if (uploadError) {
+        console.error('Upload failed:', uploadError)
+        this.syncStatus.error = uploadError.message
+        return
       }
+      
+      // Download data from Supabase
+      console.log('📥 Downloading data from cloud...')
+      const { data: cloudData, error: downloadError } = await dataSync.downloadUserData(user.id)
+      
+      if (downloadError) {
+        console.error('Download failed:', downloadError)
+        this.syncStatus.error = downloadError.message
+        return
+      }
+      
+      if (cloudData) {
+        console.log('🔄 Merging cloud data with local data...')
+        
+        // Merge trades
+        const cloudTrades = cloudData.trades || []
+        const localTradeIds = new Set(localTrades.map(t => t.id))
+        
+        for (const cloudTrade of cloudTrades) {
+          if (!localTradeIds.has(cloudTrade.id)) {
+            console.log('➕ Adding new trade from cloud:', cloudTrade.id)
+            await tradesDb.create(cloudTrade)
+          }
+        }
+        
+        // Merge capital
+        const cloudCapital = cloudData.capital || []
+        const localCapitalIds = new Set(localCapital.map(c => c.id))
+        
+        for (const cloudCapitalRecord of cloudCapital) {
+          if (!localCapitalIds.has(cloudCapitalRecord.id)) {
+            console.log('➕ Adding new capital record from cloud:', cloudCapitalRecord.id)
+            await capitalDb.create(cloudCapitalRecord)
+          }
+        }
+        
+        console.log('✅ Auto-sync completed - merged data')
+      } else {
+        console.log('✅ Auto-sync completed - no cloud data to merge')
+      }
+      
+      this.syncStatus.lastSync = new Date()
+      this.syncStatus.error = null
+      
     } catch (error) {
       console.error('Auto-sync failed:', error)
       this.syncStatus.error = error instanceof Error ? error.message : 'Sync failed'
