@@ -43,37 +43,58 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
 
   const checkAuthStatus = async () => {
     try {
+      console.log('🔍 Checking auth status...')
       const currentUser = await auth.getCurrentUser()
       const session = await auth.getSession()
       
-      setIsAuthenticated(!!currentUser && !!session)
+      console.log('👤 Current user:', currentUser)
+      console.log('🔐 Session:', session)
+      
+      const isAuth = !!currentUser && !!session
+      console.log('✅ Is authenticated:', isAuth)
+      
+      setIsAuthenticated(isAuth)
       setUser(currentUser)
     } catch (error) {
-      console.error('Auth check failed:', error)
+      console.error('❌ Auth check failed:', error)
       setIsAuthenticated(false)
     }
   }
 
   const handleSignIn = async () => {
+    console.log('🔐 Starting sign in process...')
+    
     // For now, we'll use a simple demo user
     // In production, you'd have a proper login form
     const email = prompt('Enter email:') || 'demo@example.com'
     const password = prompt('Enter password:') || 'demo123'
     
+    console.log('📧 Email:', email)
+    console.log('🔑 Password:', password ? '***' : 'empty')
+    
     try {
+      console.log('🔄 Attempting sign in...')
       const { data, error } = await auth.signIn(email, password)
+      
       if (error) {
+        console.log('❌ Sign in failed, trying sign up...', error)
         // If sign in fails, try sign up
         const { data: signUpData, error: signUpError } = await auth.signUp(email, password)
         if (signUpError) {
-          console.error('Sign up failed:', signUpError)
+          console.error('❌ Sign up failed:', signUpError)
+          alert(`שגיאה בהרשמה: ${signUpError.message}`)
           return
         }
+        console.log('✅ Sign up successful:', signUpData)
+      } else {
+        console.log('✅ Sign in successful:', data)
       }
       
+      console.log('🔄 Checking auth status...')
       await checkAuthStatus()
     } catch (error) {
-      console.error('Auth error:', error)
+      console.error('❌ Auth error:', error)
+      alert(`שגיאה בהתחברות: ${error}`)
     }
   }
 
