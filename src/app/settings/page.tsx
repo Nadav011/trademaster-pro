@@ -125,6 +125,17 @@ export default function SettingsPage() {
         is_active: true,
       })
       setNewEntryReason('')
+      
+      // Trigger auto-sync after adding entry reason
+      console.log('🔄 Entry reason added, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after adding entry reason')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after adding entry reason:', syncError)
+      }
+      
       await loadData()
       setSuccess('סיבת כניסה נוספה בהצלחה')
       setTimeout(() => setSuccess(null), 3000)
@@ -143,6 +154,17 @@ export default function SettingsPage() {
         is_active: true,
       })
       setNewEmotionalState('')
+      
+      // Trigger auto-sync after adding emotional state
+      console.log('🔄 Emotional state added, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after adding emotional state')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after adding emotional state:', syncError)
+      }
+      
       await loadData()
       setSuccess('מצב רגשי נוסף בהצלחה')
       setTimeout(() => setSuccess(null), 3000)
@@ -155,6 +177,17 @@ export default function SettingsPage() {
   const toggleEntryReasonActive = async (id: string, isActive: boolean) => {
     try {
       await entryReasonsDb.update(id, { is_active: !isActive })
+      
+      // Trigger auto-sync after updating entry reason
+      console.log('🔄 Entry reason updated, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after updating entry reason')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after updating entry reason:', syncError)
+      }
+      
       await loadData()
     } catch (err) {
       console.error('Failed to toggle entry reason:', err)
@@ -165,6 +198,17 @@ export default function SettingsPage() {
   const toggleEmotionalStateActive = async (id: string, isActive: boolean) => {
     try {
       await emotionalStatesDb.update(id, { is_active: !isActive })
+      
+      // Trigger auto-sync after updating emotional state
+      console.log('🔄 Emotional state updated, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after updating emotional state')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after updating emotional state:', syncError)
+      }
+      
       await loadData()
     } catch (err) {
       console.error('Failed to toggle emotional state:', err)
@@ -177,6 +221,17 @@ export default function SettingsPage() {
 
     try {
       await entryReasonsDb.delete(id)
+      
+      // Trigger auto-sync after deleting entry reason
+      console.log('🔄 Entry reason deleted, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after deleting entry reason')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after deleting entry reason:', syncError)
+      }
+      
       await loadData()
       setSuccess('סיבת כניסה נמחקה בהצלחה')
       setTimeout(() => setSuccess(null), 3000)
@@ -191,6 +246,17 @@ export default function SettingsPage() {
 
     try {
       await emotionalStatesDb.delete(id)
+      
+      // Trigger auto-sync after deleting emotional state
+      console.log('🔄 Emotional state deleted, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after deleting emotional state')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after deleting emotional state:', syncError)
+      }
+      
       await loadData()
       setSuccess('מצב רגשי נמחק בהצלחה')
       setTimeout(() => setSuccess(null), 3000)

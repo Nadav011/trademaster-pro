@@ -171,6 +171,17 @@ export default function TradesList() {
     if (window.confirm('האם אתה בטוח שברצונך למחוק את העסקה?')) {
       try {
         await tradesDb.delete(trade.id)
+        
+        // Trigger auto-sync after deleting trade
+        console.log('🔄 Trade deleted, triggering auto-sync...')
+        try {
+          const { triggerAutoSync } = await import('@/lib/supabase')
+          await triggerAutoSync()
+          console.log('✅ Auto-sync completed after trade deletion')
+        } catch (syncError) {
+          console.error('❌ Auto-sync failed after trade deletion:', syncError)
+        }
+        
         await loadTrades()
       } catch (err) {
         console.error('Failed to delete trade:', err)

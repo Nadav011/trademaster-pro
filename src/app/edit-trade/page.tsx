@@ -303,6 +303,16 @@ export default function EditTrade() {
 
       await tradesDb.update(tradeId!, updatedTrade)
       
+      // Trigger auto-sync after updating trade
+      console.log('🔄 Trade updated, triggering auto-sync...')
+      try {
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after trade update')
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after trade update:', syncError)
+      }
+      
       router.push('/trades/')
     } catch (err) {
       console.error('Failed to update trade:', err)
