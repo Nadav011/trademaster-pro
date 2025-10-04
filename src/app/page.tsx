@@ -12,7 +12,9 @@ import {
   tradeDatabase, 
   capitalDatabase, 
   calculateTradeMetrics,
-  initializeDatabase 
+  initializeDatabase,
+  tradesDb,
+  capitalDb
 } from '@/lib/database-client'
 import { finnhubAPI } from '@/lib/finnhub'
 import { apiConfig } from '@/lib/api-config'
@@ -614,6 +616,64 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center justify-between sm:justify-end space-x-4 space-x-reverse">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const trades = await tradeDatabase.findAll()
+                  const capital = await capitalDatabase.getCapitalHistory()
+                  alert(`נתונים מקומיים:\nעסקאות: ${trades.length}\nרשומות הון: ${capital.length}`)
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">בדוק נתונים</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  // Create sample data for testing
+                  const sampleTrade = {
+                    symbol: 'AAPL',
+                    direction: 'Long' as const,
+                    entry_price: 150,
+                    position_size: 100,
+                    datetime: new Date().toISOString(),
+                    exit_price: 155,
+                    exit_datetime: new Date(Date.now() + 86400000).toISOString(),
+                    result_dollars: 500,
+                    result_percent: 3.33,
+                    r_units: 1.5,
+                    stop_loss: 145,
+                    take_profit: 160,
+                    entry_reason: 'Breakout above resistance',
+                    emotional_state: 'Confident',
+                    market_timing: 'Market' as const,
+                    risk_level: 2 as const,
+                    planned_stop_loss: 145,
+                    emotional_entry: 'Confident' as const
+                  }
+                  
+                  const sampleCapital = {
+                    type: 'Deposit' as const,
+                    date: new Date().toISOString(),
+                    actual_datetime: new Date().toISOString(),
+                    amount: 10000,
+                    description: 'Initial capital deposit'
+                  }
+                  
+                  await tradesDb.create(sampleTrade)
+                  await capitalDb.create(sampleCapital)
+                  
+                  alert('נתונים לדוגמה נוצרו! לחץ על רענן כדי לראות אותם בדשבורד.')
+                  loadDashboardData()
+                }}
+                className="flex items-center space-x-2 space-x-reverse"
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">נתונים לדוגמה</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

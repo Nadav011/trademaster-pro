@@ -113,54 +113,98 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
   }
 
   const handleUpload = async () => {
-    if (!user) return
+    if (!user) {
+      alert('אין משתמש מחובר. אנא התחבר תחילה.')
+      return
+    }
     
     setIsManualSync(true)
     try {
+      console.log('🔄 Starting upload for user:', user.id)
       const trades = await tradeDatabase.findAll()
       const capital = await capitalDatabase.getCapitalHistory()
       
-      const { error } = await dataSync.uploadUserData(user.id, trades, capital)
+      console.log('📤 Uploading data - trades:', trades.length, 'capital:', capital.length)
+      
+      const { data, error } = await dataSync.uploadUserData(user.id, trades, capital)
       
       if (error) {
-        console.error('Upload failed:', error)
+        console.error('❌ Upload failed:', error)
+        alert(`שגיאה בהעלאת נתונים: ${error.message}`)
+        setSyncStatus(prev => ({ ...prev, error: error.message }))
       } else {
-        console.log('✅ Data uploaded successfully')
+        console.log('✅ Data uploaded successfully:', data)
+        alert(`נתונים הועלו בהצלחה! ${trades.length} עסקאות ו-${capital.length} רשומות הון`)
         setSyncStatus(prev => ({ ...prev, lastSync: new Date(), error: null }))
         onSyncComplete?.()
       }
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error('❌ Upload error:', error)
+      alert(`שגיאה בהעלאת נתונים: ${error}`)
+      setSyncStatus(prev => ({ ...prev, error: error instanceof Error ? error.message : 'Upload failed' }))
     } finally {
       setIsManualSync(false)
     }
   }
 
   const handleDownload = async () => {
-    if (!user) return
+    if (!user) {
+      alert('אין משתמש מחובר. אנא התחבר תחילה.')
+      return
+    }
     
     setIsManualSync(true)
     try {
+      console.log('🔄 Starting download for user:', user.id)
       const { data, error } = await dataSync.downloadUserData(user.id)
       
       if (error) {
-        console.error('Download failed:', error)
+        console.error('❌ Download failed:', error)
+        alert(`שגיאה בהורדת נתונים: ${error.message}`)
+        setSyncStatus(prev => ({ ...prev, error: error.message }))
       } else if (data) {
-        // Import the data
+        console.log('📥 Downloaded data:', data)
+        
+        // Clear existing data first
+        const existingTrades = await tradesDb.findAll()
+        const existingCapital = await capitalDb.findAll()
+        
+        console.log('🗑️ Clearing existing data - trades:', existingTrades.length, 'capital:', existingCapital.length)
+        
+        // Clear existing data
+        for (const trade of existingTrades) {
+          await tradesDb.delete(trade.id)
+        }
+        for (const capital of existingCapital) {
+          await capitalDb.delete(capital.id)
+        }
+        
+        // Import the new data
+        let importedTrades = 0
+        let importedCapital = 0
+        
         for (const trade of data.trades || []) {
           await tradesDb.create(trade)
+          importedTrades++
         }
         
         for (const capital of data.capital || []) {
           await capitalDb.create(capital)
+          importedCapital++
         }
         
-        console.log('✅ Data downloaded successfully')
+        console.log('✅ Data downloaded successfully - trades:', importedTrades, 'capital:', importedCapital)
+        alert(`נתונים הורדו בהצלחה! ${importedTrades} עסקאות ו-${importedCapital} רשומות הון`)
         setSyncStatus(prev => ({ ...prev, lastSync: new Date(), error: null }))
         onSyncComplete?.()
+      } else {
+        console.log('⚠️ No data found for user')
+        alert('לא נמצאו נתונים להורדה עבור המשתמש הזה')
       }
     } catch (error) {
-      console.error('Download error:', error)
+      console.error('❌ Download error:', error)
+      alert(`שגיאה בהורדת נתונים: ${error}`)
+      setSyncStatus(prev => ({ ...prev, error: error instanceof Error ? error.message : 'Download failed' }))
     } finally {
       setIsManualSync(false)
     }

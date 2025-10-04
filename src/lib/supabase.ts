@@ -83,12 +83,27 @@ export const dataSync = {
   },
 
   async downloadUserData(userId: string) {
+    console.log('🔍 Downloading data for user:', userId)
+    
+    // First check if the table exists
+    const { data: tableCheck, error: tableError } = await supabase
+      .from('user_data')
+      .select('count', { count: 'exact', head: true })
+    
+    if (tableError) {
+      console.error('❌ Table check failed:', tableError)
+      return { data: null, error: tableError }
+    }
+    
+    console.log('✅ Table exists, proceeding with download')
+    
     const { data, error } = await supabase
       .from('user_data')
       .select('*')
       .eq('user_id', userId)
       .single()
 
+    console.log('📥 Download result:', { data, error })
     return { data, error }
   },
 
