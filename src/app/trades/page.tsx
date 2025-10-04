@@ -94,7 +94,7 @@ export default function TradesList() {
       }
 
       // Get current prices with rate limiting
-      const prices = []
+      const prices: PromiseSettledResult<{ symbol: string; data: any }>[] = []
       const batchSize = 5 // Smaller batches for better performance
       
       for (let i = 0; i < symbols.length; i += batchSize) {

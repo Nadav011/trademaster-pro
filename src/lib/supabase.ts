@@ -216,7 +216,7 @@ export const dataSync = {
       }
       
       // Import database client
-      const { tradesDb, capitalDb, calculateTradeMetrics } = await import('./database-client')
+      const { tradesDb, capitalDb, calculateTradeMetrics, capitalDatabase } = await import('./database-client')
       
       // Clear all local data first
       console.log('🗑️ Clearing all local data...')
@@ -307,6 +307,8 @@ export class SyncManager {
       return
     }
 
+    let syncTimeout: NodeJS.Timeout | null = null
+    
     try {
       this.syncStatus.isSyncing = true
       this.syncStatus.error = null
@@ -319,7 +321,7 @@ export class SyncManager {
       }
       
       // Add timeout to prevent hanging
-      const syncTimeout = setTimeout(() => {
+      syncTimeout = setTimeout(() => {
         console.log('⏰ Auto-sync timeout, stopping sync')
         this.syncStatus.isSyncing = false
         this.syncStatus.error = 'Sync timeout'
@@ -511,12 +513,12 @@ export class SyncManager {
       this.syncStatus.error = null
       
       // Clear timeout on success
-      clearTimeout(syncTimeout)
+      if (syncTimeout) clearTimeout(syncTimeout)
       
     } catch (error) {
       console.error('Auto-sync failed:', error)
       this.syncStatus.error = error instanceof Error ? error.message : 'Sync failed'
-      clearTimeout(syncTimeout)
+      if (syncTimeout) clearTimeout(syncTimeout)
     } finally {
       this.syncStatus.isSyncing = false
     }
@@ -716,7 +718,7 @@ class AutoSyncService {
     }
   }
 
-  private showSyncNotification(message: string) {
+  public showSyncNotification(message: string) {
     // Create notification element
     const notification = document.createElement('div')
     notification.textContent = message
@@ -758,7 +760,7 @@ class AutoSyncService {
     }, 4000)
   }
 
-  private notifyOtherTabs() {
+  public notifyOtherTabs() {
     // Use localStorage to notify other tabs
     const event = {
       type: 'DATA_SYNCED',

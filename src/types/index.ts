@@ -38,6 +38,7 @@ export interface Capital {
   type: 'Initial' | 'Deposit' | 'Withdrawal' | 'Reconciliation';
   notes?: string;
   created_at: string; // ISO string
+  updated_at?: string; // ISO string
 }
 
 export interface CapitalSummary {
