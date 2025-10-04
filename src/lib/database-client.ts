@@ -256,12 +256,23 @@ export const capitalDatabase = {
     let unrealizedPnl = 0;
     
     if (openTrades.length > 0) {
-      // This would need current market prices
-      // For now, we'll return 0 for unrealized P&L
-      unrealizedPnl = 0;
+      // Calculate unrealized P&L based on current prices or entry prices
+      unrealizedPnl = openTrades.reduce((sum, trade) => {
+        const currentPrice = trade.current_price || trade.entry_price;
+        const profitLoss = trade.direction === 'Long' 
+          ? (currentPrice - trade.entry_price) * trade.position_size
+          : (trade.entry_price - currentPrice) * trade.position_size;
+        return sum + profitLoss;
+      }, 0);
     }
     
     const totalEquity = baseCapital + realizedPnl + unrealizedPnl;
+    
+    console.log('💰 Capital Summary Calculation:');
+    console.log('Base Capital:', baseCapital);
+    console.log('Realized P&L:', realizedPnl);
+    console.log('Unrealized P&L:', unrealizedPnl);
+    console.log('Total Equity:', totalEquity);
     
     return {
       base_capital: baseCapital,

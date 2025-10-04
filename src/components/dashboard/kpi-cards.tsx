@@ -30,6 +30,27 @@ export function KPICards({ kpis, isLoading = false }: KPICardsProps) {
     )
   }
 
+  // Check if we have meaningful data to show
+  const hasData = kpis.total_trades > 0 || kpis.total_profit_loss_closed !== 0 || kpis.total_profit_loss_open !== 0
+  if (!hasData) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="apple-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="h-4 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-4 w-4 bg-gray-100 dark:bg-gray-800 rounded" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded mb-2" />
+              <div className="h-3 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   const cards = [
     {
       title: 'אחוז הצלחה',

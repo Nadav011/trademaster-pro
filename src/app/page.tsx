@@ -118,7 +118,7 @@ export default function Dashboard() {
 
       // Update open trades with current prices
       setOpenTrades(prevTrades => {
-        const updatedTrades = prevTrades.map(trade => {
+        return prevTrades.map(trade => {
           const priceData = allPrices.find(p => p.symbol === trade.symbol)
           if (!priceData?.data) return trade
 
@@ -148,10 +148,6 @@ export default function Dashboard() {
             unrealized_percentage: ((currentPrice - entryPrice) / entryPrice) * 100,
           }
         })
-
-        // Recalculate KPIs with updated prices
-        recalculateKPIsWithUpdatedPrices(updatedTrades)
-        return updatedTrades
       })
     } catch (error) {
       console.error('Failed to load current prices:', error)
@@ -162,6 +158,8 @@ export default function Dashboard() {
 
   const recalculateKPIsWithUpdatedPrices = async (updatedOpenTrades: TradeWithCalculations[]) => {
     try {
+      console.log('🔄 Updating KPIs with real-time prices...')
+      
       // Get all trades again
       const allTrades = await tradeDatabase.findAll()
       const closedTrades = allTrades.filter(trade => trade.exit_price)
@@ -238,19 +236,31 @@ export default function Dashboard() {
       try {
         const capitalSummary = await capitalDatabase.getCapitalSummary()
         totalCurrentCapital = capitalSummary.total_equity
+        console.log('📊 Updated Capital Summary:', capitalSummary)
+        console.log('💰 Updated Total Current Capital:', totalCurrentCapital)
       } catch (error) {
         console.error('Failed to get capital summary:', error)
-        // Fallback: estimate based on own capital + P&L
-        totalCurrentCapital = totalProfitLossClosed + (updatedOpenTrades.length * 1000)
+        // Fallback: use base capital + closed P&L
+        const baseCapital = 10000 // Default base capital
+        totalCurrentCapital = baseCapital + totalProfitLossClosed
+        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
       }
       
+      // Calculate daily change percentage based on total capital
       const dailyChangePercent = totalCurrentCapital > 0 
         ? (dailyChangeDollars / totalCurrentCapital) * 100 
         : 0
       
+      // Calculate weekly change percentage based on total capital
       const weeklyChangePercent = totalCurrentCapital > 0 
         ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
+
+      console.log('📈 Updated Change Calculations:')
+      console.log('Daily change dollars:', dailyChangeDollars)
+      console.log('Weekly change dollars:', weeklyChangeDollars)
+      console.log('Daily change percent:', dailyChangePercent)
+      console.log('Weekly change percent:', weeklyChangePercent)
 
       // Calculate open trades P&L with updated prices
       const totalProfitLossOpen = updatedOpenTrades.reduce((sum, trade) => {
@@ -275,11 +285,12 @@ export default function Dashboard() {
         losing_trades: totalLosingTrades,
       }
 
-      console.log('📊 Updated KPIs with API prices:')
+      console.log('📊 Final KPIs with real-time prices:')
       console.log('Total profit/loss open:', totalProfitLossOpen)
       console.log('Daily change dollars:', dailyChangeDollars)
       console.log('Weekly change dollars:', weeklyChangeDollars)
 
+      // Update KPIs with real-time data
       setKpis(updatedKpis)
     } catch (error) {
       console.error('Error recalculating KPIs:', error)
@@ -308,6 +319,25 @@ export default function Dashboard() {
       // Calculate KPIs - include both closed and open trades
       const closedTrades = allTrades.filter(trade => trade.exit_price)
       const openTrades = allTrades.filter(trade => !trade.exit_price)
+
+      // Don't show KPIs until we have complete data
+      if (allTrades.length === 0) {
+        setKpis({
+          win_rate: 0,
+          daily_change_percent: 0,
+          daily_change_dollars: 0,
+          weekly_change_percent: 0,
+          weekly_change_dollars: 0,
+          total_r: 0,
+          total_profit_loss_closed: 0,
+          total_profit_loss_open: 0,
+          total_trades: 0,
+          winning_trades: 0,
+          losing_trades: 0,
+        })
+        setIsLoading(false)
+        return
+      }
       
       // For closed trades
       const winningClosedTrades = closedTrades.filter(trade => 
@@ -393,19 +423,31 @@ export default function Dashboard() {
       try {
         const capitalSummary = await capitalDatabase.getCapitalSummary()
         totalCurrentCapital = capitalSummary.total_equity
+        console.log('📊 Capital Summary:', capitalSummary)
+        console.log('💰 Total Current Capital:', totalCurrentCapital)
       } catch (error) {
         console.error('Failed to get capital summary:', error)
-        // Fallback: estimate based on own capital + P&L
-        totalCurrentCapital = totalProfitLossClosed + (openTrades.length * 1000)
+        // Fallback: use base capital + closed P&L
+        const baseCapital = 10000 // Default base capital
+        totalCurrentCapital = baseCapital + totalProfitLossClosed
+        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
       }
       
+      // Calculate daily change percentage based on total capital
       const dailyChangePercent = totalCurrentCapital > 0 
         ? (dailyChangeDollars / totalCurrentCapital) * 100 
         : 0
       
+      // Calculate weekly change percentage based on total capital
       const weeklyChangePercent = totalCurrentCapital > 0 
         ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
+
+      console.log('📈 Change Calculations:')
+      console.log('Daily change dollars:', dailyChangeDollars)
+      console.log('Weekly change dollars:', weeklyChangeDollars)
+      console.log('Daily change percent:', dailyChangePercent)
+      console.log('Weekly change percent:', weeklyChangePercent)
 
       // Calculate open trades P&L - FIXED: Now properly calculates for all open trades
       const totalProfitLossOpen = openTrades.reduce((sum, trade) => {
@@ -464,8 +506,6 @@ export default function Dashboard() {
         setError('הנתונים לא מסונכרנים עם הנייד. אנא הוסף נתונים דרך הדסקטופ או לחץ על כפתור הרענון.')
       }
 
-      setKpis(calculatedKpis)
-
       // Convert open trades to TradeWithCalculations
       const openTradesWithCalculations: TradeWithCalculations[] = openTradesData.map(trade => ({
         ...trade,
@@ -479,24 +519,27 @@ export default function Dashboard() {
 
       setOpenTrades(openTradesWithCalculations)
 
+      // Extract unique symbols from open trades for live stocks
+      const symbols = [...new Set(openTradesData.map(trade => trade.symbol))]
+      setLiveStockSymbols(symbols)
+
+      // Set KPIs only after all data is ready
+      setKpis(calculatedKpis)
+      setIsLoading(false)
+
       // Load current prices for open trades (only if API key is configured)
-      // Don't await this - let it load in background
+      // This will only update the open trades display, not the KPIs
       if (openTradesData.length > 0 && finnhubApiKey) {
+        console.log('🔄 Loading current prices for open trades display...')
         loadCurrentPrices(openTradesData).catch(error => {
           console.error('Background price loading failed:', error)
         })
       }
 
-      // Extract unique symbols from open trades for live stocks
-      const symbols = [...new Set(openTradesData.map(trade => trade.symbol))]
-      setLiveStockSymbols(symbols)
-
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
       setError('שגיאה בטעינת נתוני הדאשבורד')
-    } finally {
       setIsLoading(false)
-      console.log('✅ Dashboard data loaded successfully')
     }
   }
 
