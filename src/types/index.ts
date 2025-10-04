@@ -85,9 +85,13 @@ export interface CapitalSummary {
 
 export interface DashboardKPIs {
   win_rate: number;
-  average_r: number;
+  daily_change_percent: number;
+  daily_change_dollars: number;
+  weekly_change_percent: number;
+  weekly_change_dollars: number;
   total_r: number;
-  total_profit_loss: number;
+  total_profit_loss_closed: number;
+  total_profit_loss_open: number;
   total_trades: number;
   winning_trades: number;
   losing_trades: number;

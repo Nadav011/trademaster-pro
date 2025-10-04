@@ -53,10 +53,18 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    direction: rtl;
+    font-family: 'Assistant', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
   body {
     @apply bg-background text-foreground;
     direction: rtl;
-    font-family: 'Assistant', 'Inter', sans-serif;
+    font-family: 'Assistant', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   /* RTL Support */
@@ -70,11 +78,18 @@
   
   /* Hebrew font support */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Assistant', 'Inter', sans-serif;
+    font-family: 'Assistant', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
   }
   
-  p, span, div {
-    font-family: 'Assistant', 'Inter', sans-serif;
+  p, span, div, button, input, textarea, select {
+    font-family: 'Assistant', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  /* Ensure proper text rendering */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -100,9 +115,13 @@
   @apply animate-spin rounded-full h-4 w-4 border-b-2 border-primary;
 }
 
-/* Apple-inspired clean design */
+/* Apple-inspired clean design - optimized for performance */
 .apple-card {
-  @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-gray-900/20;
+  @apply bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-gray-900/20;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .apple-button {
@@ -129,6 +148,56 @@
 
 [data-radix-dialog-overlay] {
   @apply z-40;
+}
+
+/* Fix for proper display and performance */
+.apple-card {
+  position: relative;
+  z-index: 1;
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+/* Ensure proper stacking */
+.apple-card * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Navigation transitions removed to prevent white screen issues */
+
+/* Fix for RTL layout issues */
+[dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+  margin-right: calc(var(--tw-space-x) * var(--tw-space-x-reverse));
+  margin-left: calc(var(--tw-space-x) * calc(1 - var(--tw-space-x-reverse)));
+}
+
+/* Performance optimizations */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Prevent FOUC (Flash of Unstyled Content) */
+html {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Optimize animations */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Mobile optimizations */
@@ -174,4 +243,32 @@
   select {
     font-size: 16px !important;
   }
+}
+
+/* Additional performance fixes */
+body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent layout shifts */
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Font loading is handled by Google Fonts link in layout.tsx */
+
+/* Fix for navigation transitions */
+nav, .navigation {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Prevent text selection issues */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }

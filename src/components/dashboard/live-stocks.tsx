@@ -9,7 +9,7 @@ import { formatCurrency, getProfitLossColor } from '@/lib/utils'
 
 interface LiveStocksProps {
   symbols: string[]
-  openTrades?: Trade[]
+  openTrades?: TradeWithCalculations[]
   onTradeUpdate?: (trades: TradeWithCalculations[]) => void
 }
 
@@ -33,7 +33,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
       setIsOnline(true)
     } catch (err) {
       console.error('Failed to fetch stocks:', err)
-      setError('שגיאה בטעינת נתוני מניות')
+      setError('שגיאה בטעינת נתוני מניות - בדוק את הגדרות ה-API')
       setIsOnline(false)
     } finally {
       setIsLoading(false)
@@ -76,9 +76,9 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
   }
 
   // Calculate profit/loss since purchase
-  const calculateTradeProfit = (symbol: string, currentPrice: number) => {
+  const calculateTradeProfit = (symbol: string, currentPrice: number, stockChangePercent: number) => {
     const trades = openTrades.filter(trade => trade.symbol === symbol)
-    if (trades.length === 0) return { percentage: 0, amount: 0, totalShares: 0 }
+    if (trades.length === 0) return { percentage: 0, amount: 0, totalShares: 0, dailyChange: 0, dailyChangePercent: 0 }
 
     let totalShares = 0
     let totalCost = 0
@@ -98,12 +98,21 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
     const profitAmount = totalValue - totalCost
     const profitPercentage = totalCost > 0 ? (profitAmount / totalCost) * 100 : 0
 
+    // Calculate daily change in position value based on stock's daily change
+    // This shows how much your position value changed today
+    const stockDailyChange = stockChangePercent / 100
+    const yesterdayValue = totalValue / (1 + stockDailyChange)
+    const dailyChange = totalValue - yesterdayValue
+    const dailyChangePercent = yesterdayValue > 0 ? (dailyChange / yesterdayValue) * 100 : 0
+
     return {
       percentage: profitPercentage,
       amount: profitAmount,
       totalShares,
       totalCost,
-      totalValue
+      totalValue,
+      dailyChange,
+      dailyChangePercent
     }
   }
 
@@ -141,12 +150,17 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
         {error && (
           <div className="text-center py-4">
             <div className="text-red-600 text-sm mb-2">{error}</div>
-            <button
-              onClick={fetchStocks}
-              className="text-blue-600 hover:text-blue-700 text-sm"
-            >
-              נסה שוב
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={fetchStocks}
+                className="text-blue-600 hover:text-blue-700 text-sm"
+              >
+                נסה שוב
+              </button>
+              <div className="text-xs text-gray-500">
+                ודא שה-API key מוגדר בהגדרות
+              </div>
+            </div>
           </div>
         )}
 
@@ -181,7 +195,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
                 )
               }
 
-              const tradeProfit = calculateTradeProfit(symbol, stock.price)
+              const tradeProfit = calculateTradeProfit(symbol, stock.price, stock.change_percent)
               const hasPosition = tradeProfit.totalShares > 0
 
               return (
@@ -211,17 +225,36 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
                       <div className="text-sm text-gray-500 dark:text-gray-400">מחיר נוכחי</div>
                     </div>
 
-                    {/* Daily Change */}
-                    <div className={`p-3 rounded-lg mb-3 ${
-                      stock.change > 0 ? 'bg-blue-50 dark:bg-blue-900/20' :
-                      stock.change < 0 ? 'bg-red-50 dark:bg-red-900/20' :
-                      'bg-gray-50 dark:bg-gray-900/20'
-                    }`}>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">יום:</div>
-                      <div className={`font-bold ${getChangeColor(stock.change)}`}>
-                        {stock.change_percent >= 0 ? '+' : ''}{stock.change_percent.toFixed(2)}%
+                    {/* Daily Change - Show position change if available, otherwise stock change */}
+                    {hasPosition ? (
+                      <div className={`p-3 rounded-lg mb-3 ${
+                        tradeProfit.dailyChange > 0 ? 'bg-green-50 dark:bg-green-900/20' :
+                        tradeProfit.dailyChange < 0 ? 'bg-red-50 dark:bg-red-900/20' :
+                        'bg-gray-50 dark:bg-gray-900/20'
+                      }`}>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">שינוי יומי בפוזיציה:</div>
+                        <div className={`font-bold text-lg ${getChangeColor(tradeProfit.dailyChange)} mb-1`}>
+                          {tradeProfit.dailyChange >= 0 ? '+' : ''}{formatCurrency(tradeProfit.dailyChange)}
+                        </div>
+                        <div className={`text-sm ${getChangeColor(tradeProfit.dailyChange)}`}>
+                          ({tradeProfit.dailyChangePercent >= 0 ? '+' : ''}{tradeProfit.dailyChangePercent.toFixed(2)}%)
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className={`p-3 rounded-lg mb-3 ${
+                        stock.change > 0 ? 'bg-blue-50 dark:bg-blue-900/20' :
+                        stock.change < 0 ? 'bg-red-50 dark:bg-red-900/20' :
+                        'bg-gray-50 dark:bg-gray-900/20'
+                      }`}>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">שינוי יומי במניה:</div>
+                        <div className={`font-bold text-lg ${getChangeColor(stock.change)} mb-1`}>
+                          {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}$
+                        </div>
+                        <div className={`text-sm ${getChangeColor(stock.change)}`}>
+                          ({stock.change_percent >= 0 ? '+' : ''}{stock.change_percent.toFixed(2)}%)
+                        </div>
+                      </div>
+                    )}
 
                     {/* Trade Profit/Loss */}
                     {hasPosition && (

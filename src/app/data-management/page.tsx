@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Navigation } from '@/components/layout/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,18 @@ export default function DataManagement() {
   const [isClearing, setIsClearing] = useState(false)
   const [importData, setImportData] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [dataStats, setDataStats] = useState(DataManager.getDataStats())
+  const [dataStats, setDataStats] = useState({
+    trades: 0,
+    capital: 0,
+    entryReasons: 0,
+    emotionalStates: 0,
+    users: 0,
+  })
+
+  // Load data stats on component mount
+  useEffect(() => {
+    setDataStats(DataManager.getDataStats())
+  }, [])
 
   const handleExport = async () => {
     try {
@@ -47,6 +58,8 @@ export default function DataManagement() {
       setIsImporting(true)
       await DataManager.importData(importData)
       setMessage({ type: 'success', text: 'הנתונים יובאו בהצלחה! הדף ירענן כעת.' })
+      // Update stats after import
+      setDataStats(DataManager.getDataStats())
     } catch (error) {
       setMessage({ type: 'error', text: `שגיאה בייבוא הנתונים: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}` })
     } finally {
@@ -63,6 +76,8 @@ export default function DataManagement() {
       setIsClearing(true)
       await DataManager.clearAllData()
       setMessage({ type: 'success', text: 'כל הנתונים נמחקו בהצלחה! הדף ירענן כעת.' })
+      // Update stats after clearing
+      setDataStats(DataManager.getDataStats())
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
       setMessage({ type: 'error', text: 'שגיאה במחיקת הנתונים' })
@@ -97,6 +112,19 @@ export default function DataManagement() {
               ייצוא, ייבוא ומחיקת נתוני המסחר שלך
             </p>
           </div>
+
+          {/* API Status */}
+          <Card className="apple-card border-yellow-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 space-x-reverse text-yellow-600">
+                <AlertTriangle className="h-5 w-5" />
+                <span className="font-medium">מחירים מדומים</span>
+              </div>
+              <p className="text-sm text-yellow-600 mt-1">
+                המחירים הנוכחיים הם נתונים מדומים. להפעלת מחירים אמיתיים, הוסף Finnhub API key בהגדרות.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Data Statistics */}
           <Card className="apple-card">

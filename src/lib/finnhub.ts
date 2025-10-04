@@ -104,6 +104,11 @@ class FinnhubAPI {
 
   async getQuote(symbol: string): Promise<MarketData> {
     try {
+      // Check if API key is available
+      if (!this.apiKey) {
+        throw new Error('Finnhub API key not configured');
+      }
+
       const response = await this.makeRequest<FinnhubQuoteResponse>(`/quote?symbol=${symbol}`);
       
       return {
@@ -118,6 +123,7 @@ class FinnhubAPI {
       throw error;
     }
   }
+
 
   async getMultipleQuotes(symbols: string[]): Promise<MarketData[]> {
     const results: MarketData[] = [];
