@@ -110,6 +110,11 @@ class StopLossMonitor {
         notes: `סגירה אוטומטית בסטופ לוס ב-${new Date().toLocaleString('he-IL')}`,
       });
 
+      // Trigger auto-sync after automatic stop loss closure
+      console.log('🔄 Stop loss triggered, triggering auto-sync...')
+      const { triggerAutoSync } = await import('./supabase')
+      await triggerAutoSync()
+
       // Create alert
       const alert: StopLossAlert = {
         tradeId: trade.id,

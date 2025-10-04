@@ -153,6 +153,11 @@ export default function TradeDetails() {
         notes: closeData.notes,
       })
 
+      // Trigger auto-sync after closing trade
+      console.log('🔄 Trade closed, triggering auto-sync...')
+      const { triggerAutoSync } = await import('@/lib/supabase')
+      await triggerAutoSync()
+
       await loadTrade()
     } catch (err) {
       console.error('Failed to close trade:', err)
@@ -166,6 +171,12 @@ export default function TradeDetails() {
     if (window.confirm('האם אתה בטוח שברצונך למחוק את העסקה?')) {
       try {
         await tradesDb.delete(trade.id)
+        
+        // Trigger auto-sync after deleting trade
+        console.log('🔄 Trade deleted, triggering auto-sync...')
+        const { triggerAutoSync } = await import('@/lib/supabase')
+        await triggerAutoSync()
+        
         router.push('/trades')
       } catch (err) {
         console.error('Failed to delete trade:', err)
