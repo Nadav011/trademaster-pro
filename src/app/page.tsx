@@ -548,11 +548,15 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboardData()
     
-    // Auto-sync on page load
-    const autoSyncOnLoad = async () => {
+    // Initialize auth listener for better localStorage management
+    const initializeAuth = async () => {
       try {
-        // Check if user should be authenticated
-        const { auth, startAutoSyncService } = await import('@/lib/supabase')
+        const { initializeAuthListener, auth, startAutoSyncService } = await import('@/lib/supabase')
+        
+        // Initialize the auth listener
+        initializeAuthListener()
+        
+        // Check current auth state
         const isAuthStateSaved = auth.isAuthStateSaved()
         const savedEmail = auth.getSavedUserEmail()
         
@@ -578,6 +582,11 @@ export default function Dashboard() {
       } catch (error) {
         console.error('❌ Auto-sync on load failed:', error)
       }
+    }
+    
+    // Auto-sync on page load
+    const autoSyncOnLoad = async () => {
+      await initializeAuth()
     }
     
     // Run auto-sync after a short delay to ensure page is loaded
@@ -704,7 +713,17 @@ export default function Dashboard() {
                     
                     if (user) {
                       message += `אימייל נוכחי: ${user.email}\n`
-                      message += `ID: ${user.id}`
+                      message += `ID: ${user.id}\n\n`
+                      
+                      // If user is authenticated but not saved to localStorage, save it now
+                      if (!isAuthStateSaved) {
+                        localStorage.setItem('trademaster_auth_state', 'authenticated')
+                        localStorage.setItem('trademaster_user_email', user.email || '')
+                        localStorage.setItem('trademaster_user_id', user.id)
+                        message += '✅ מצב התחברות נשמר ל-localStorage!'
+                      } else {
+                        message += '✅ מצב התחברות שמור ב-localStorage'
+                      }
                     }
                     
                     alert(message)
