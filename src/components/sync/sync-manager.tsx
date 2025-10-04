@@ -46,20 +46,48 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
   const checkAuthStatus = async () => {
     try {
       console.log('🔍 Checking auth status...')
-      const currentUser = await auth.getCurrentUser()
-      const session = await auth.getSession()
       
-      console.log('👤 Current user:', currentUser)
-      console.log('🔐 Session:', session)
+      // First check if auth state is saved in localStorage
+      const isAuthStateSaved = auth.isAuthStateSaved()
+      const savedEmail = auth.getSavedUserEmail()
       
-      const isAuth = !!currentUser && !!session
-      console.log('✅ Is authenticated:', isAuth)
+      console.log('💾 Auth state saved:', isAuthStateSaved)
+      console.log('📧 Saved email:', savedEmail)
       
-      setIsAuthenticated(isAuth)
-      setUser(currentUser)
+      if (isAuthStateSaved && savedEmail) {
+        console.log('🔄 Auth state found in localStorage, checking Supabase session...')
+        
+        // Try to get current session
+        const currentUser = await auth.getCurrentUser()
+        const session = await auth.getSession()
+        
+        console.log('👤 Current user:', currentUser)
+        console.log('🔐 Session:', session)
+        
+        if (currentUser && session) {
+          console.log('✅ Supabase session is valid')
+          setIsAuthenticated(true)
+          setUser(currentUser)
+        } else {
+          console.log('⚠️ Supabase session expired, but auth state is saved')
+          // Keep user as authenticated based on localStorage
+          setIsAuthenticated(true)
+          setUser({ email: savedEmail, id: 'saved-user' })
+        }
+      } else {
+        console.log('❌ No auth state found in localStorage')
+        const currentUser = await auth.getCurrentUser()
+        const session = await auth.getSession()
+        
+        const isAuth = !!currentUser && !!session
+        console.log('✅ Is authenticated:', isAuth)
+        
+        setIsAuthenticated(isAuth)
+        setUser(currentUser)
+      }
       
-      console.log('🔄 State updated - isAuthenticated:', isAuth)
-      console.log('🔄 State updated - user:', currentUser)
+      console.log('🔄 Final state - isAuthenticated:', isAuthenticated)
+      console.log('🔄 Final state - user:', user)
     } catch (error) {
       console.error('❌ Auth check failed:', error)
       setIsAuthenticated(false)

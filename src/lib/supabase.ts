@@ -36,6 +36,13 @@ export const auth = {
       email,
       password,
     })
+    
+    // Save auth state on successful signup
+    if (data.user && !error) {
+      localStorage.setItem('trademaster_auth_state', 'authenticated')
+      localStorage.setItem('trademaster_user_email', email)
+    }
+    
     return { data, error }
   },
 
@@ -44,11 +51,25 @@ export const auth = {
       email,
       password,
     })
+    
+    // Save auth state on successful signin
+    if (data.user && !error) {
+      localStorage.setItem('trademaster_auth_state', 'authenticated')
+      localStorage.setItem('trademaster_user_email', email)
+      console.log('✅ Auth state saved to localStorage')
+    }
+    
     return { data, error }
   },
 
   async signOut() {
     const { error } = await supabase.auth.signOut()
+    
+    // Clear auth state on signout
+    localStorage.removeItem('trademaster_auth_state')
+    localStorage.removeItem('trademaster_user_email')
+    console.log('✅ Auth state cleared from localStorage')
+    
     return { error }
   },
 
@@ -60,6 +81,18 @@ export const auth = {
   async getSession() {
     const { data: { session } } = await supabase.auth.getSession()
     return session
+  },
+
+  // Check if user should be authenticated based on localStorage
+  isAuthStateSaved(): boolean {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('trademaster_auth_state') === 'authenticated'
+  },
+
+  // Get saved user email
+  getSavedUserEmail(): string | null {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('trademaster_user_email')
   }
 }
 

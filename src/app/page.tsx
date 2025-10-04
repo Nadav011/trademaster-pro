@@ -551,12 +551,25 @@ export default function Dashboard() {
     // Auto-sync on page load
     const autoSyncOnLoad = async () => {
       try {
-        const { triggerAutoSync } = await import('@/lib/supabase')
-        console.log('🔄 Auto-syncing on page load...')
-        await triggerAutoSync()
-        console.log('✅ Auto-sync on page load completed')
-        // Reload dashboard data after sync
-        setTimeout(loadDashboardData, 1000)
+        // Check if user should be authenticated
+        const { auth } = await import('@/lib/supabase')
+        const isAuthStateSaved = auth.isAuthStateSaved()
+        const savedEmail = auth.getSavedUserEmail()
+        
+        console.log('🔍 Checking auth state on page load...')
+        console.log('💾 Auth state saved:', isAuthStateSaved)
+        console.log('📧 Saved email:', savedEmail)
+        
+        if (isAuthStateSaved && savedEmail) {
+          console.log('🔄 User should be authenticated, triggering auto-sync...')
+          const { triggerAutoSync } = await import('@/lib/supabase')
+          await triggerAutoSync()
+          console.log('✅ Auto-sync on page load completed')
+          // Reload dashboard data after sync
+          setTimeout(loadDashboardData, 1000)
+        } else {
+          console.log('⚠️ No saved auth state, skipping auto-sync')
+        }
       } catch (error) {
         console.error('❌ Auto-sync on load failed:', error)
       }
@@ -651,15 +664,22 @@ export default function Dashboard() {
                 size="sm"
                 onClick={async () => {
                   try {
-                    const { supabase } = await import('@/lib/supabase')
+                    const { supabase, auth } = await import('@/lib/supabase')
                     const { data: { user }, error } = await supabase.auth.getUser()
-                    if (error) {
-                      alert(`שגיאת התחברות: ${error.message}`)
-                    } else if (user) {
-                      alert(`מחובר כ: ${user.email}\nID: ${user.id}`)
-                    } else {
-                      alert('לא מחובר')
+                    const isAuthStateSaved = auth.isAuthStateSaved()
+                    const savedEmail = auth.getSavedUserEmail()
+                    
+                    let message = 'סטטוס התחברות:\n'
+                    message += `שמור ב-localStorage: ${isAuthStateSaved ? 'כן' : 'לא'}\n`
+                    message += `אימייל שמור: ${savedEmail || 'אין'}\n`
+                    message += `Supabase מחובר: ${user ? 'כן' : 'לא'}\n`
+                    
+                    if (user) {
+                      message += `אימייל נוכחי: ${user.email}\n`
+                      message += `ID: ${user.id}`
                     }
+                    
+                    alert(message)
                   } catch (error) {
                     alert(`שגיאה: ${error}`)
                   }
