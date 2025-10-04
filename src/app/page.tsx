@@ -749,10 +749,21 @@ export default function Dashboard() {
                 size="sm"
                 onClick={async () => {
                   try {
-                    const { triggerAutoSync } = await import('@/lib/supabase')
-                    console.log('🔄 Manual sync triggered...')
+                    // Check authentication first
+                    const { supabase } = await import('@/lib/supabase')
+                    const { data: { user }, error: authError } = await supabase.auth.getUser()
+                    
+                    if (authError || !user) {
+                      alert(`שגיאת התחברות: ${authError?.message || 'לא מחובר'}`)
+                      return
+                    }
+                    
+                    console.log('🔄 Manual sync triggered for user:', user.email)
                     alert('מבצע סינכרון... אנא המתן')
+                    
+                    const { triggerAutoSync } = await import('@/lib/supabase')
                     await triggerAutoSync()
+                    
                     // Reload dashboard data after sync
                     setTimeout(loadDashboardData, 1000)
                     alert('סינכרון הושלם בהצלחה!')

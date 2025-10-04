@@ -249,6 +249,17 @@ export default function AddTrade() {
       // Trigger auto-sync after creating trade
       console.log('🔄 Trade created, triggering auto-sync...')
       try {
+        // Check if user is authenticated before sync
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+          console.error('❌ User not authenticated for sync:', authError)
+          throw new Error('User not authenticated')
+        }
+        
+        console.log('✅ User authenticated for sync:', user.email)
+        
         // Show sync notification
         const syncNotification = document.createElement('div')
         syncNotification.textContent = 'מסנכרן נתונים...'
@@ -279,7 +290,7 @@ export default function AddTrade() {
         console.error('❌ Auto-sync failed after trade creation:', syncError)
         // Show error notification
         const errorNotification = document.createElement('div')
-        errorNotification.textContent = 'שגיאה בסינכרון'
+        errorNotification.textContent = `שגיאה בסינכרון: ${syncError instanceof Error ? syncError.message : String(syncError)}`
         errorNotification.style.cssText = `
           position: fixed;
           top: 20px;
@@ -294,7 +305,7 @@ export default function AddTrade() {
         document.body.appendChild(errorNotification)
         setTimeout(() => {
           document.body.removeChild(errorNotification)
-        }, 3000)
+        }, 5000)
       }
       
       router.push('/')

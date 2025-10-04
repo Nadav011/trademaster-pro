@@ -191,6 +191,7 @@ export class SyncManager {
       }
       
       console.log('✅ User authenticated for auto-sync:', user.id)
+      console.log('🔍 User email:', user.email)
 
       console.log('🔄 Auto-syncing data...')
       
@@ -201,15 +202,22 @@ export class SyncManager {
       const localTrades = await tradeDatabase.findAll()
       const localCapital = await capitalDatabase.getCapitalHistory()
       
+      console.log('📊 Local data before sync:', {
+        trades: localTrades.length,
+        capital: localCapital.length
+      })
+      
       // Upload local data to Supabase
       console.log('📤 Uploading local data...')
-      const { error: uploadError } = await dataSync.uploadUserData(user.id, localTrades, localCapital)
+      const { data: uploadResult, error: uploadError } = await dataSync.uploadUserData(user.id, localTrades, localCapital)
       
       if (uploadError) {
-        console.error('Upload failed:', uploadError)
+        console.error('❌ Upload failed:', uploadError)
         this.syncStatus.error = uploadError.message
         return
       }
+      
+      console.log('✅ Upload successful:', uploadResult)
       
       // Download data from Supabase
       console.log('📥 Downloading data from cloud...')
@@ -267,6 +275,15 @@ export class SyncManager {
       } else {
         console.log('✅ Auto-sync completed - no cloud data to merge')
       }
+      
+      // Verify sync by checking local data again
+      const finalTrades = await tradeDatabase.findAll()
+      const finalCapital = await capitalDatabase.getCapitalHistory()
+      
+      console.log('📊 Local data after sync:', {
+        trades: finalTrades.length,
+        capital: finalCapital.length
+      })
       
       this.syncStatus.lastSync = new Date()
       this.syncStatus.error = null
