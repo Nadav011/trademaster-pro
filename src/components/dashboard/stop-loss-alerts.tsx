@@ -34,11 +34,11 @@ export function StopLossAlerts() {
       setHasPermission(Notification.permission === 'granted')
     }
 
-    // Set up interval to refresh alerts
+    // Set up interval to refresh alerts (reduced frequency for better performance)
     const interval = setInterval(() => {
       setAlerts(stopLossUtils.getAlerts())
       setIsMonitoring(stopLossUtils.getMonitoringStatus())
-    }, 5000)
+    }, 30 * 1000) // 30 seconds instead of 5 seconds
 
     return () => clearInterval(interval)
   }, [])

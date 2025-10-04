@@ -42,7 +42,9 @@ export default function TradesList() {
     try {
       setIsLoading(true)
       setError(null)
-      await initializeDatabase()
+      
+      // Initialize database without waiting for sync
+      initializeDatabase().catch(console.error)
 
       const allTrades = await tradesDb.findAll()
       
@@ -60,11 +62,105 @@ export default function TradesList() {
         .sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime())
 
       setTrades(tradesWithCalculations)
+
+      // Load current prices for open trades in background (non-blocking)
+      const openTrades = tradesWithCalculations.filter(trade => !trade.exit_price)
+      if (openTrades.length > 0) {
+        // Don't wait for prices to load - show trades immediately
+        loadCurrentPrices(openTrades).catch(console.error)
+      }
     } catch (err) {
       console.error('Failed to load trades:', err)
       setError('שגיאה בטעינת העסקאות')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadCurrentPrices = async (trades: TradeWithCalculations[]) => {
+    try {
+      setIsRefreshingPrices(true)
+      const symbols = [...new Set(trades.map(trade => trade.symbol))]
+      if (symbols.length === 0) return
+
+      // Import finnhub API
+      const { finnhubAPI } = await import('@/lib/finnhub')
+      const { apiConfig } = await import('@/lib/api-config')
+      
+      // Set up API key
+      const finnhubApiKey = apiConfig.getFinnhubApiKey()
+      if (finnhubApiKey) {
+        finnhubAPI.setApiKey(finnhubApiKey)
+      }
+
+      // Get current prices with rate limiting
+      const prices = []
+      const batchSize = 5 // Smaller batches for better performance
+      
+      for (let i = 0; i < symbols.length; i += batchSize) {
+        const batch = symbols.slice(i, i + batchSize)
+        
+        const batchPrices = await Promise.allSettled(
+          batch.map(async (symbol) => {
+            try {
+              const quote = await finnhubAPI.getQuote(symbol)
+              return { symbol, data: quote }
+            } catch (error) {
+              console.error(`Failed to get price for ${symbol}:`, error)
+              return { symbol, data: null }
+            }
+          })
+        )
+        
+        prices.push(...batchPrices)
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < symbols.length) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+
+      // Update trades with current prices
+      const updatedTrades = trades.map(trade => {
+        const priceResult = prices.find(p => 
+          p.status === 'fulfilled' && p.value.symbol === trade.symbol
+        )
+        
+        if (priceResult && priceResult.status === 'fulfilled' && priceResult.value.data) {
+          const currentPrice = priceResult.value.data.price
+          const dailyChange = priceResult.value.data.change
+          
+          return {
+            ...trade,
+            current_price: currentPrice,
+            daily_change: dailyChange,
+            unrealized_pnl: trade.direction === 'Long' 
+              ? (currentPrice - trade.entry_price) * trade.position_size
+              : (trade.entry_price - currentPrice) * trade.position_size,
+            unrealized_r_units: trade.planned_stop_loss 
+              ? ((currentPrice - trade.entry_price) * (trade.direction === 'Long' ? 1 : -1)) / 
+                Math.abs(trade.entry_price - trade.planned_stop_loss)
+              : 0,
+            unrealized_percentage: ((currentPrice - trade.entry_price) / trade.entry_price) * 100 * 
+              (trade.direction === 'Long' ? 1 : -1)
+          }
+        }
+        
+        return trade
+      })
+
+      setTrades(updatedTrades)
+    } catch (error) {
+      console.error('Failed to load current prices:', error)
+    } finally {
+      setIsRefreshingPrices(false)
+    }
+  }
+
+  const handleRefreshPrices = async () => {
+    const openTrades = trades.filter(trade => !trade.exit_price)
+    if (openTrades.length > 0) {
+      await loadCurrentPrices(openTrades)
     }
   }
 

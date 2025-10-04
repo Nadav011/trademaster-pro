@@ -16,7 +16,11 @@ import {
   Edit, 
   Trash2,
   Save,
-  X
+  X,
+  Eye,
+  RefreshCw,
+  EyeOff,
+  Copy
 } from 'lucide-react'
 import { 
   usersDb,
@@ -48,6 +52,20 @@ export default function SettingsPage() {
   const [editingEntryReason, setEditingEntryReason] = useState<string | null>(null)
   const [editingEmotionalState, setEditingEmotionalState] = useState<string | null>(null)
   const [finnhubApiKey, setFinnhubApiKey] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
+
+  const copyApiKey = async () => {
+    if (finnhubApiKey) {
+      try {
+        await navigator.clipboard.writeText(finnhubApiKey)
+        setSuccess('מפתח API הועתק ללוח')
+        setTimeout(() => setSuccess(null), 3000)
+      } catch (err) {
+        console.error('Failed to copy API key:', err)
+        setError('שגיאה בהעתקת המפתח')
+      }
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -356,19 +374,55 @@ export default function SettingsPage() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="finnhub_api_key">מפתח Finnhub API</Label>
-                  <Input
-                    id="finnhub_api_key"
-                    type="password"
-                    value={finnhubApiKey}
-                    onChange={(e) => setFinnhubApiKey(e.target.value)}
-                    placeholder="הכנס את מפתח ה-API שלך"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="finnhub_api_key"
+                      type={showApiKey ? "text" : "password"}
+                      value={finnhubApiKey}
+                      onChange={(e) => setFinnhubApiKey(e.target.value)}
+                      placeholder="הכנס את מפתח ה-API שלך"
+                      className="pr-20"
+                    />
+                    <div className="absolute left-0 top-0 h-full flex items-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        title={showApiKey ? "הסתר מפתח" : "הצג מפתח"}
+                      >
+                        {showApiKey ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                      {finnhubApiKey && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-full px-3 py-2 hover:bg-transparent"
+                          onClick={copyApiKey}
+                          title="העתק מפתח"
+                        >
+                          <Copy className="h-4 w-4 text-gray-400" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     מפתח זה נדרש לקבלת מחירי שוק חיים. ניתן לקבל מפתח חינמי מ-
                     <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                       Finnhub.io
                     </a>
                   </p>
+                  {finnhubApiKey && (
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✅ מפתח API מוגדר: {showApiKey ? finnhubApiKey : '••••••••••••••••'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-end">
@@ -571,6 +625,102 @@ export default function SettingsPage() {
                   <p className="text-gray-500 dark:text-gray-400">אין מצבים רגשיים</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Data Management */}
+          <Card className="apple-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 space-x-reverse">
+                <Settings className="h-5 w-5 text-blue-600" />
+                <span>ניהול נתונים</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  כלים לניקוי ותחזוקה של הנתונים
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        const { calculateTradeMetrics } = await import('@/lib/database-client')
+                        const duplicatesRemoved = await calculateTradeMetrics.removeDuplicates()
+                        alert(`נוקו ${duplicatesRemoved} עסקאות כפולות`)
+                        // Refresh data after cleanup
+                        loadData()
+                      } catch (error) {
+                        console.error('Error removing duplicates:', error)
+                        alert('שגיאה בניקוי כפילויות')
+                      }
+                    }}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Trash2 className="h-4 w-4 ml-2" />
+                    נקה עסקאות כפולות
+                  </Button>
+
+                  <Button 
+                    onClick={async () => {
+                      if (confirm('האם אתה בטוח? זה ימחק את כל הנתונים המקומיים ויוריד מחדש מהענן')) {
+                        try {
+                          const { dataSync, auth } = await import('@/lib/supabase')
+                          const user = await auth.getCurrentUser()
+                          
+                          if (!user) {
+                            alert('אין משתמש מחובר')
+                            return
+                          }
+                          
+                          const result = await dataSync.forceCleanDownload(user.id)
+                          
+                          if (result.error) {
+                            alert(`שגיאה בסינכרון נקי: ${result.error.message}`)
+                          } else {
+                            alert(`סינכרון נקי הושלם! ${result.data?.tradesImported} עסקאות ו-${result.data?.capitalImported} רשומות הון`)
+                            // Refresh data after sync
+                            loadData()
+                          }
+                        } catch (error) {
+                          console.error('Error in force clean sync:', error)
+                          alert('שגיאה בסינכרון נקי')
+                        }
+                      }
+                    }}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    <RefreshCw className="h-4 w-4 ml-2" />
+                    סינכרון נקי מהענן
+                  </Button>
+
+                  <Button 
+                    onClick={async () => {
+                      if (confirm('האם אתה בטוח? זה ימחק את כל הנתונים המקומיים')) {
+                        try {
+                          const { calculateTradeMetrics, capitalDatabase } = await import('@/lib/database-client')
+                          await calculateTradeMetrics.clearAll()
+                          await capitalDatabase.clearAll()
+                          alert('כל הנתונים המקומיים נמחקו')
+                          // Refresh data after cleanup
+                          loadData()
+                        } catch (error) {
+                          console.error('Error clearing all data:', error)
+                          alert('שגיאה במחיקת נתונים')
+                        }
+                      }
+                    }}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    <Trash2 className="h-4 w-4 ml-2" />
+                    מחק כל הנתונים המקומיים
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

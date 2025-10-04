@@ -25,7 +25,9 @@ class StopLossMonitor {
     if (this.isMonitoring) return;
     
     this.isMonitoring = true;
-    console.log('🛡️ Stop Loss Monitor started');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🛡️ Stop Loss Monitor started');
+    }
     
     // Check immediately
     await this.checkStopLosses();
@@ -42,7 +44,9 @@ class StopLossMonitor {
       this.monitoringInterval = null;
     }
     this.isMonitoring = false;
-    console.log('🛑 Stop Loss Monitor stopped');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🛑 Stop Loss Monitor stopped');
+    }
   }
 
   private async checkStopLosses(): Promise<void> {
@@ -110,10 +114,12 @@ class StopLossMonitor {
         notes: `סגירה אוטומטית בסטופ לוס ב-${new Date().toLocaleString('he-IL')}`,
       });
 
-      // Trigger auto-sync after automatic stop loss closure
+      // Trigger auto-sync after automatic stop loss closure (debounced for performance)
       console.log('🔄 Stop loss triggered, triggering auto-sync...')
-      const { triggerAutoSync } = await import('./supabase')
-      await triggerAutoSync()
+      setTimeout(async () => {
+        const { triggerAutoSync } = await import('./supabase')
+        await triggerAutoSync()
+      }, 1000) // 1 second delay to prevent excessive sync calls
 
       // Create alert
       const alert: StopLossAlert = {

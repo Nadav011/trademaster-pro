@@ -129,18 +129,27 @@ class FinnhubAPI {
     const results: MarketData[] = [];
     const batches = this.createBatches(symbols, RATE_LIMIT_CONFIG.batchSize);
 
-    console.log(`Fetching quotes for ${symbols.length} symbols in ${batches.length} batches...`);
+    // Optimized logging for performance
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Fetching quotes for ${symbols.length} symbols in ${batches.length} batches...`);
+    }
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      console.log(`Processing batch ${i + 1}/${batches.length} with ${batch.length} symbols`);
+      // Optimized logging for performance
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Processing batch ${i + 1}/${batches.length} with ${batch.length} symbols`);
+      }
 
       // Process batch concurrently
       const batchPromises = batch.map(async (symbol) => {
         try {
           return await this.getQuote(symbol);
         } catch (error) {
-          console.error(`Failed to fetch quote for ${symbol}:`, error);
+          // Optimized logging for performance
+          if (process.env.NODE_ENV === 'development') {
+            console.error(`Failed to fetch quote for ${symbol}:`, error);
+          }
           return {
             symbol,
             price: 0,
@@ -155,10 +164,13 @@ class FinnhubAPI {
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
 
-      // Wait between batches (except for the last one)
+      // Wait between batches (except for the last one) - reduced delay for better performance
       if (i < batches.length - 1) {
-        console.log(`Waiting ${RATE_LIMIT_CONFIG.delayBetweenBatches}ms before next batch...`);
-        await this.delay(RATE_LIMIT_CONFIG.delayBetweenBatches);
+        // Optimized logging for performance
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Waiting ${RATE_LIMIT_CONFIG.delayBetweenBatches}ms before next batch...`);
+        }
+        await this.delay(Math.min(RATE_LIMIT_CONFIG.delayBetweenBatches, 500)); // Max 500ms delay
       }
     }
 

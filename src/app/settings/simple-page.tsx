@@ -6,14 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Settings } from 'lucide-react'
+import { Settings, Eye, EyeOff, Copy } from 'lucide-react'
 import { apiConfig } from '@/lib/api-config'
 
 export default function SimpleSettings() {
   const [finnhubApiKey, setFinnhubApiKey] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const copyApiKey = async () => {
+    if (finnhubApiKey) {
+      try {
+        await navigator.clipboard.writeText(finnhubApiKey)
+        setSuccess('מפתח API הועתק ללוח')
+        setTimeout(() => setSuccess(null), 3000)
+      } catch (err) {
+        console.error('Failed to copy API key:', err)
+        setError('שגיאה בהעתקת המפתח')
+      }
+    }
+  }
 
   useEffect(() => {
     // Simple loading without complex dependencies
@@ -105,19 +119,55 @@ export default function SimpleSettings() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="finnhub_api_key">מפתח Finnhub API</Label>
-                  <Input
-                    id="finnhub_api_key"
-                    type="password"
-                    value={finnhubApiKey}
-                    onChange={(e) => setFinnhubApiKey(e.target.value)}
-                    placeholder="הכנס את מפתח ה-API שלך"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="finnhub_api_key"
+                      type={showApiKey ? "text" : "password"}
+                      value={finnhubApiKey}
+                      onChange={(e) => setFinnhubApiKey(e.target.value)}
+                      placeholder="הכנס את מפתח ה-API שלך"
+                      className="pr-20"
+                    />
+                    <div className="absolute left-0 top-0 h-full flex items-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        title={showApiKey ? "הסתר מפתח" : "הצג מפתח"}
+                      >
+                        {showApiKey ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                      {finnhubApiKey && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-full px-3 py-2 hover:bg-transparent"
+                          onClick={copyApiKey}
+                          title="העתק מפתח"
+                        >
+                          <Copy className="h-4 w-4 text-gray-400" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     מפתח זה נדרש לקבלת מחירי שוק חיים. ניתן לקבל מפתח חינמי מ-
                     <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                       Finnhub.io
                     </a>
                   </p>
+                  {finnhubApiKey && (
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✅ מפתח API מוגדר: {showApiKey ? finnhubApiKey : '••••••••••••••••'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-end">

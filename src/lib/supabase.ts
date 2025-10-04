@@ -195,6 +195,74 @@ export const dataSync = {
       .eq('user_id', userId)
 
     return { error }
+  },
+
+  // Force clean sync - download from cloud and replace all local data
+  async forceCleanDownload(userId: string) {
+    console.log('🧹 Starting force clean download...')
+    
+    try {
+      // Get cloud data
+      const { data: cloudData, error } = await this.downloadUserData(userId)
+      
+      if (error) {
+        console.error('❌ Failed to download cloud data:', error)
+        return { error }
+      }
+      
+      if (!cloudData) {
+        console.log('⚠️ No cloud data found')
+        return { data: null, error: null }
+      }
+      
+      // Import database client
+      const { tradesDb, capitalDb, calculateTradeMetrics } = await import('./database-client')
+      
+      // Clear all local data first
+      console.log('🗑️ Clearing all local data...')
+      await calculateTradeMetrics.clearAll()
+      await capitalDatabase.clearAll()
+      
+      // Import cloud data
+      let importedTrades = 0
+      let importedCapital = 0
+      
+      console.log('📥 Importing cloud data...')
+      
+      // Import trades
+      for (const trade of cloudData.trades || []) {
+        try {
+          await tradesDb.create(trade)
+          importedTrades++
+        } catch (error) {
+          console.error('❌ Failed to import trade:', error)
+        }
+      }
+      
+      // Import capital
+      for (const capital of cloudData.capital || []) {
+        try {
+          await capitalDb.create(capital)
+          importedCapital++
+        } catch (error) {
+          console.error('❌ Failed to import capital record:', error)
+        }
+      }
+      
+      console.log(`✅ Force clean download completed - ${importedTrades} trades, ${importedCapital} capital records`)
+      
+      return { 
+        data: { 
+          tradesImported: importedTrades, 
+          capitalImported: importedCapital 
+        }, 
+        error: null 
+      }
+      
+    } catch (error) {
+      console.error('❌ Force clean download failed:', error)
+      return { data: null, error: error instanceof Error ? error : new Error('Force clean download failed') }
+    }
   }
 }
 
@@ -249,6 +317,13 @@ export class SyncManager {
         this.syncStatus.error = 'User not authenticated'
         return
       }
+      
+      // Add timeout to prevent hanging
+      const syncTimeout = setTimeout(() => {
+        console.log('⏰ Auto-sync timeout, stopping sync')
+        this.syncStatus.isSyncing = false
+        this.syncStatus.error = 'Sync timeout'
+      }, 30000) // 30 second timeout
       
       console.log('✅ User authenticated for auto-sync:', user.id)
       console.log('🔍 User email:', user.email)
@@ -306,17 +381,22 @@ export class SyncManager {
           capital: localCapital.length
         })
         
-        // Merge trades
+        // Merge trades - use smart merge to prevent duplicates
         const cloudTrades = cloudData.trades || []
-        const localTradeIds = new Set(localTrades.map(t => t.id))
+        const localTradesMap = new Map(localTrades.map(t => [t.id, t]))
         
-        console.log('🔍 Checking for new trades from cloud...')
-        console.log('🔍 Local trade IDs:', Array.from(localTradeIds))
-        console.log('🔍 Cloud trade IDs:', cloudTrades.map((t: any) => t.id))
+        console.log('🔍 Smart merging trades from cloud...')
+        console.log('🔍 Local trades count:', localTrades.length)
+        console.log('🔍 Cloud trades count:', cloudTrades.length)
         
         let newTradesAdded = 0
+        let tradesUpdated = 0
+        
         for (const cloudTrade of cloudTrades) {
-          if (!localTradeIds.has(cloudTrade.id)) {
+          const localTrade = localTradesMap.get(cloudTrade.id)
+          
+          if (!localTrade) {
+            // Trade doesn't exist locally - add it
             console.log('➕ Adding new trade from cloud:', cloudTrade.id, cloudTrade.symbol)
             try {
               await tradesDb.create(cloudTrade)
@@ -326,27 +406,74 @@ export class SyncManager {
               console.error('❌ Failed to add trade:', createError)
             }
           } else {
-            console.log('⚠️ Trade already exists locally:', cloudTrade.id)
+            // Trade exists - check if cloud version is newer
+            const cloudUpdated = new Date(cloudTrade.updated_at || cloudTrade.created_at)
+            const localUpdated = new Date(localTrade.updated_at || localTrade.created_at)
+            
+            if (cloudUpdated > localUpdated) {
+              console.log('🔄 Updating existing trade with newer cloud version:', cloudTrade.id)
+              try {
+                await tradesDb.update(cloudTrade.id, cloudTrade)
+                tradesUpdated++
+                console.log('✅ Trade updated successfully:', cloudTrade.id)
+              } catch (updateError) {
+                console.error('❌ Failed to update trade:', updateError)
+              }
+            } else {
+              console.log('✅ Trade is up to date locally:', cloudTrade.id)
+            }
           }
         }
         
-        // Merge capital
+        // Merge capital - use smart merge to prevent duplicates
         const cloudCapital = cloudData.capital || []
-        const localCapitalIds = new Set(localCapital.map(c => c.id))
+        const localCapitalMap = new Map(localCapital.map(c => [c.id, c]))
         
-        console.log('🔍 Checking for new capital records from cloud...')
+        console.log('🔍 Smart merging capital records from cloud...')
+        console.log('🔍 Local capital count:', localCapital.length)
+        console.log('🔍 Cloud capital count:', cloudCapital.length)
+        
         let newCapitalAdded = 0
+        let capitalUpdated = 0
+        
         for (const cloudCapitalRecord of cloudCapital) {
-          if (!localCapitalIds.has(cloudCapitalRecord.id)) {
+          const localCapitalRecord = localCapitalMap.get(cloudCapitalRecord.id)
+          
+          if (!localCapitalRecord) {
+            // Capital record doesn't exist locally - add it
             console.log('➕ Adding new capital record from cloud:', cloudCapitalRecord.id)
-            await capitalDb.create(cloudCapitalRecord)
-            newCapitalAdded++
+            try {
+              await capitalDb.create(cloudCapitalRecord)
+              newCapitalAdded++
+              console.log('✅ Capital record added successfully:', cloudCapitalRecord.id)
+            } catch (createError) {
+              console.error('❌ Failed to add capital record:', createError)
+            }
+          } else {
+            // Capital record exists - check if cloud version is newer
+            const cloudUpdated = new Date(cloudCapitalRecord.updated_at || cloudCapitalRecord.created_at)
+            const localUpdated = new Date(localCapitalRecord.updated_at || localCapitalRecord.created_at)
+            
+            if (cloudUpdated > localUpdated) {
+              console.log('🔄 Updating existing capital record with newer cloud version:', cloudCapitalRecord.id)
+              try {
+                await capitalDb.update(cloudCapitalRecord.id, cloudCapitalRecord)
+                capitalUpdated++
+                console.log('✅ Capital record updated successfully:', cloudCapitalRecord.id)
+              } catch (updateError) {
+                console.error('❌ Failed to update capital record:', updateError)
+              }
+            } else {
+              console.log('✅ Capital record is up to date locally:', cloudCapitalRecord.id)
+            }
           }
         }
         
-        console.log('✅ Auto-sync completed - merged data:', {
+        console.log('✅ Auto-sync completed - smart merge results:', {
           newTradesAdded,
-          newCapitalAdded
+          tradesUpdated,
+          newCapitalAdded,
+          capitalUpdated
         })
       } else {
         console.log('✅ Auto-sync completed - no cloud data to merge')
@@ -383,9 +510,13 @@ export class SyncManager {
       this.syncStatus.lastSync = new Date()
       this.syncStatus.error = null
       
+      // Clear timeout on success
+      clearTimeout(syncTimeout)
+      
     } catch (error) {
       console.error('Auto-sync failed:', error)
       this.syncStatus.error = error instanceof Error ? error.message : 'Sync failed'
+      clearTimeout(syncTimeout)
     } finally {
       this.syncStatus.isSyncing = false
     }
@@ -498,46 +629,83 @@ class AutoSyncService {
         return
       }
 
-      console.log('📥 Cloud data is newer, performing sync...')
+      console.log('📥 Cloud data is newer, performing smart sync...')
       
       // Import the database client
       const { tradesDb, capitalDb } = await import('./database-client')
       
-      // Clear existing data
+      // Get existing data for smart merge
       const existingTrades = await tradesDb.findAll()
       const existingCapital = await capitalDb.findAll()
       
-      console.log('🗑️ Clearing existing data - trades:', existingTrades.length, 'capital:', existingCapital.length)
+      console.log('🔍 Smart merging cloud data - existing trades:', existingTrades.length, 'existing capital:', existingCapital.length)
       
-      // Clear existing data
-      for (const trade of existingTrades) {
-        await tradesDb.delete(trade.id)
-      }
-      for (const capital of existingCapital) {
-        await capitalDb.delete(capital.id)
-      }
-      
-      // Import the new data
+      // Smart merge trades
+      const existingTradesMap = new Map(existingTrades.map(t => [t.id, t]))
       let importedTrades = 0
-      let importedCapital = 0
+      let updatedTrades = 0
       
-      for (const trade of cloudData.trades || []) {
-        await tradesDb.create(trade)
-        importedTrades++
+      for (const cloudTrade of cloudData.trades || []) {
+        const existingTrade = existingTradesMap.get(cloudTrade.id)
+        
+        if (!existingTrade) {
+          // New trade - add it
+          await tradesDb.create(cloudTrade)
+          importedTrades++
+        } else {
+          // Existing trade - check if cloud version is newer
+          const cloudUpdated = new Date(cloudTrade.updated_at || cloudTrade.created_at)
+          const localUpdated = new Date(existingTrade.updated_at || existingTrade.created_at)
+          
+          if (cloudUpdated > localUpdated) {
+            await tradesDb.update(cloudTrade.id, cloudTrade)
+            updatedTrades++
+          }
+        }
       }
       
-      for (const capital of cloudData.capital || []) {
-        await capitalDb.create(capital)
-        importedCapital++
+      // Smart merge capital
+      const existingCapitalMap = new Map(existingCapital.map(c => [c.id, c]))
+      let importedCapital = 0
+      let updatedCapital = 0
+      
+      for (const cloudCapital of cloudData.capital || []) {
+        const existingCapitalRecord = existingCapitalMap.get(cloudCapital.id)
+        
+        if (!existingCapitalRecord) {
+          // New capital record - add it
+          await capitalDb.create(cloudCapital)
+          importedCapital++
+        } else {
+          // Existing capital record - check if cloud version is newer
+          const cloudUpdated = new Date(cloudCapital.updated_at || cloudCapital.created_at)
+          const localUpdated = new Date(existingCapitalRecord.updated_at || existingCapitalRecord.created_at)
+          
+          if (cloudUpdated > localUpdated) {
+            await capitalDb.update(cloudCapital.id, cloudCapital)
+            updatedCapital++
+          }
+        }
       }
       
       this.lastSyncTime = cloudLastSync
       
-      console.log('✅ Periodic sync completed - trades:', importedTrades, 'capital:', importedCapital)
+      console.log('✅ Periodic sync completed - smart merge results:', {
+        importedTrades,
+        updatedTrades,
+        importedCapital,
+        updatedCapital
+      })
       
       // Show notification if data changed
-      if (importedTrades > 0 || importedCapital > 0) {
-        this.showSyncNotification(`נתונים עודכנו: ${importedTrades} עסקאות, ${importedCapital} רשומות הון`)
+      if (importedTrades > 0 || updatedTrades > 0 || importedCapital > 0 || updatedCapital > 0) {
+        const changes = []
+        if (importedTrades > 0) changes.push(`${importedTrades} עסקאות חדשות`)
+        if (updatedTrades > 0) changes.push(`${updatedTrades} עסקאות עודכנו`)
+        if (importedCapital > 0) changes.push(`${importedCapital} רשומות הון חדשות`)
+        if (updatedCapital > 0) changes.push(`${updatedCapital} רשומות הון עודכנו`)
+        
+        this.showSyncNotification(`נתונים מסונכרנים: ${changes.join(', ')}`)
         
         // Trigger page refresh for all open tabs
         this.notifyOtherTabs()

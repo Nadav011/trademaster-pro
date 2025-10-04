@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, RefreshCw, Wifi, WifiOff, DollarSign } from 'lucide-react'
 import Link from 'next/link'
@@ -21,7 +21,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
   const [isOnline, setIsOnline] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchStocks = async () => {
+  const fetchStocks = useCallback(async () => {
     if (symbols.length === 0) return
 
     setIsLoading(true)
@@ -39,16 +39,16 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [symbols])
 
   useEffect(() => {
     fetchStocks()
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStocks, 30000)
+    // Auto-refresh every 2 minutes (reduced frequency for better performance)
+    const interval = setInterval(fetchStocks, 2 * 60 * 1000)
     
     return () => clearInterval(interval)
-  }, [symbols])
+  }, [symbols, fetchStocks])
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('he-IL', {

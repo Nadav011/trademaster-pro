@@ -268,11 +268,14 @@ export const capitalDatabase = {
     
     const totalEquity = baseCapital + realizedPnl + unrealizedPnl;
     
-    console.log('💰 Capital Summary Calculation:');
-    console.log('Base Capital:', baseCapital);
-    console.log('Realized P&L:', realizedPnl);
-    console.log('Unrealized P&L:', unrealizedPnl);
-    console.log('Total Equity:', totalEquity);
+    // Optimized logging for performance
+    if (process.env.NODE_ENV === 'development') {
+      console.log('💰 Capital Summary Calculation:');
+      console.log('Base Capital:', baseCapital);
+      console.log('Realized P&L:', realizedPnl);
+      console.log('Unrealized P&L:', unrealizedPnl);
+      console.log('Total Equity:', totalEquity);
+    }
     
     return {
       base_capital: baseCapital,
@@ -387,12 +390,99 @@ export const calculateTradeMetrics = {
       await tradesDb.delete(item.id);
     }
   },
+
+  // Remove duplicate trades based on multiple criteria
+  async removeDuplicates(): Promise<number> {
+    const allTrades = await tradeDatabase.findAll();
+    const uniqueTrades = new Map<string, Trade>();
+    let duplicatesRemoved = 0;
+
+    console.log(`🔍 Checking ${allTrades.length} trades for duplicates...`);
+
+    for (const trade of allTrades) {
+      // Create multiple unique keys to catch different types of duplicates
+      const keys = [
+        `${trade.symbol}-${trade.datetime}-${trade.entry_price}`, // Same trade
+        `${trade.symbol}-${trade.datetime}`, // Same symbol and time
+        `${trade.id}`, // Same ID (should not happen but might)
+      ];
+      
+      let isDuplicate = false;
+      let duplicateKey = '';
+      
+      // Check if any key already exists
+      for (const key of keys) {
+        if (uniqueTrades.has(key)) {
+          isDuplicate = true;
+          duplicateKey = key;
+          break;
+        }
+      }
+      
+      if (isDuplicate) {
+        // This is a duplicate - keep the one with the latest updated_at
+        const existingTrade = uniqueTrades.get(duplicateKey)!;
+        const existingUpdated = new Date(existingTrade.updated_at || existingTrade.created_at);
+        const currentUpdated = new Date(trade.updated_at || trade.created_at);
+        
+        if (currentUpdated > existingUpdated) {
+          // Current trade is newer - remove the old one and keep current
+          console.log(`🔄 Replacing duplicate trade: ${existingTrade.symbol} (${existingTrade.id}) with newer version (${trade.id})`);
+          await tradesDb.delete(existingTrade.id);
+          // Update the map with the new trade
+          for (const key of keys) {
+            uniqueTrades.delete(key);
+            uniqueTrades.set(key, trade);
+          }
+          duplicatesRemoved++;
+        } else {
+          // Existing trade is newer - remove current one
+          console.log(`🗑️ Removing older duplicate trade: ${trade.symbol} (${trade.id})`);
+          await tradesDb.delete(trade.id);
+          duplicatesRemoved++;
+        }
+      } else {
+        // First occurrence - keep it and add all keys
+        for (const key of keys) {
+          uniqueTrades.set(key, trade);
+        }
+      }
+    }
+
+    console.log(`🧹 Removed ${duplicatesRemoved} duplicate trades`);
+    return duplicatesRemoved;
+  },
+
+  // Force clean sync - clear all data and reimport from cloud
+  async forceCleanSync(): Promise<{ tradesImported: number, capitalImported: number }> {
+    console.log('🧹 Starting force clean sync...');
+    
+    // Clear all existing data
+    const allTrades = await tradeDatabase.findAll();
+    const allCapital = await capitalDatabase.getCapitalHistory();
+    
+    console.log(`🗑️ Clearing ${allTrades.length} trades and ${allCapital.length} capital records...`);
+    
+    // Clear trades
+    for (const trade of allTrades) {
+      await tradesDb.delete(trade.id);
+    }
+    
+    // Clear capital
+    for (const capital of allCapital) {
+      await capitalDb.delete(capital.id);
+    }
+    
+    console.log('✅ Local data cleared, ready for clean import');
+    
+    return { tradesImported: 0, capitalImported: 0 };
+  },
 };
 
 // Re-export marketDataUtils from finnhub
 export { marketDataUtils } from './finnhub';
 
-export default {
+const databaseClient = {
   tradesDb,
   capitalDb,
   entryReasonsDb,
@@ -403,3 +493,5 @@ export default {
   calculateTradeMetrics,
   initializeDatabase,
 };
+
+export default databaseClient;

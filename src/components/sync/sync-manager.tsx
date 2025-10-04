@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,21 +29,7 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
   const [user, setUser] = useState<any>(null)
   const [isManualSync, setIsManualSync] = useState(false)
 
-  useEffect(() => {
-    console.log('🔄 SyncManagerComponent mounted')
-    
-    // Check authentication status
-    checkAuthStatus()
-    
-    // Set up sync status updates
-    const interval = setInterval(() => {
-      setSyncStatus(syncManager.getStatus())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
     try {
       console.log('🔍 Checking auth status...')
       
@@ -85,14 +71,26 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
         setIsAuthenticated(isAuth)
         setUser(currentUser)
       }
-      
-      console.log('🔄 Final state - isAuthenticated:', isAuthenticated)
-      console.log('🔄 Final state - user:', user)
     } catch (error) {
       console.error('❌ Auth check failed:', error)
       setIsAuthenticated(false)
+      setUser(null)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    console.log('🔄 SyncManagerComponent mounted')
+    
+    // Check authentication status
+    checkAuthStatus()
+    
+    // Set up sync status updates
+    const interval = setInterval(() => {
+      setSyncStatus(syncManager.getStatus())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [checkAuthStatus])
 
   const handleSignIn = async () => {
     console.log('🔐 Starting sign in process...')
