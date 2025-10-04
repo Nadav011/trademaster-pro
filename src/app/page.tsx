@@ -554,10 +554,11 @@ export default function Dashboard() {
         const { triggerAutoSync } = await import('@/lib/supabase')
         console.log('🔄 Auto-syncing on page load...')
         await triggerAutoSync()
+        console.log('✅ Auto-sync on page load completed')
         // Reload dashboard data after sync
         setTimeout(loadDashboardData, 1000)
       } catch (error) {
-        console.error('Auto-sync on load failed:', error)
+        console.error('❌ Auto-sync on load failed:', error)
       }
     }
     

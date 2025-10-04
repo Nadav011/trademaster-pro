@@ -174,7 +174,10 @@ export class SyncManager {
   }
 
   async autoSync() {
-    if (!this.syncStatus.isOnline || this.syncStatus.isSyncing) return
+    if (!this.syncStatus.isOnline || this.syncStatus.isSyncing) {
+      console.log('⚠️ Auto-sync skipped - offline or already syncing')
+      return
+    }
 
     try {
       this.syncStatus.isSyncing = true
@@ -182,9 +185,12 @@ export class SyncManager {
 
       const user = await auth.getCurrentUser()
       if (!user) {
+        console.log('⚠️ Auto-sync skipped - user not authenticated')
         this.syncStatus.error = 'User not authenticated'
         return
       }
+      
+      console.log('✅ User authenticated for auto-sync:', user.id)
 
       console.log('🔄 Auto-syncing data...')
       

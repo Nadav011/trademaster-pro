@@ -244,10 +244,58 @@ export default function AddTrade() {
       }
 
       await tradesDb.create(tradeData)
+      console.log('✅ Trade created successfully:', tradeData.symbol)
       
       // Trigger auto-sync after creating trade
       console.log('🔄 Trade created, triggering auto-sync...')
-      await triggerAutoSync()
+      try {
+        // Show sync notification
+        const syncNotification = document.createElement('div')
+        syncNotification.textContent = 'מסנכרן נתונים...'
+        syncNotification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #4CAF50;
+          color: white;
+          padding: 10px 20px;
+          border-radius: 5px;
+          z-index: 10000;
+          font-family: Arial, sans-serif;
+        `
+        document.body.appendChild(syncNotification)
+        
+        await triggerAutoSync()
+        console.log('✅ Auto-sync completed after trade creation')
+        
+        // Update notification
+        syncNotification.textContent = 'סינכרון הושלם!'
+        syncNotification.style.background = '#2196F3'
+        setTimeout(() => {
+          document.body.removeChild(syncNotification)
+        }, 2000)
+        
+      } catch (syncError) {
+        console.error('❌ Auto-sync failed after trade creation:', syncError)
+        // Show error notification
+        const errorNotification = document.createElement('div')
+        errorNotification.textContent = 'שגיאה בסינכרון'
+        errorNotification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #f44336;
+          color: white;
+          padding: 10px 20px;
+          border-radius: 5px;
+          z-index: 10000;
+          font-family: Arial, sans-serif;
+        `
+        document.body.appendChild(errorNotification)
+        setTimeout(() => {
+          document.body.removeChild(errorNotification)
+        }, 3000)
+      }
       
       router.push('/')
     } catch (err) {
