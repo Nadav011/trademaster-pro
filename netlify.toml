@@ -6,6 +6,14 @@
   NODE_VERSION = "18"
   NPM_FLAGS = "--version"
 
+# Deploy Preview Configuration
+# Every branch gets its own preview URL automatically!
+[context.deploy-preview]
+  command = "npm ci && npm run build"
+  
+[context.branch-deploy]
+  command = "npm ci && npm run build"
+
 # Next.js App Router configuration
 # Let Next.js handle routing naturally - no redirects needed
 

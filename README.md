@@ -46,7 +46,34 @@ npm run build
 
 # הרצה מקומית
 npm run start
+
+# קבל קישור לתצוגה מקדימה
+npm run preview-url
 ```
+
+## 🚀 תצוגה מקדימה מהירה (Preview Deployments)
+
+**עורך מה-iPad או מהטלפון? רוצה לראות שינויים מיד?**
+
+כל ענף מקבל אוטומטית תצוגה מקדימה משלו ב-Netlify!
+
+```bash
+# 1. צור ענף חדש
+git checkout -b feature/my-changes
+
+# 2. ערוך את הקוד (גם מה-iPad!)
+# ...
+
+# 3. שמור ודחף
+git add .
+git commit -m "תיאור השינויים"
+git push
+
+# 4. קבל קישור תצוגה מקדימה תוך 2-3 דקות!
+npm run preview-url
+```
+
+📖 **מידע מלא**: ראה את [QUICK_PREVIEW.md](./QUICK_PREVIEW.md) להסבר מפורט
 
 ## 📋 דרישות מערכת
 
