@@ -44,8 +44,8 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
   useEffect(() => {
     fetchStocks()
     
-    // Auto-refresh every 2 minutes (reduced frequency for better performance)
-    const interval = setInterval(fetchStocks, 2 * 60 * 1000)
+    // Auto-refresh every 5 minutes to reduce API calls and prevent jumping
+    const interval = setInterval(fetchStocks, 5 * 60 * 1000)
     
     return () => clearInterval(interval)
   }, [symbols, fetchStocks])
