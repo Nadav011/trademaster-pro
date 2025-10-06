@@ -16,6 +16,7 @@ import {
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { RealtimeIndicator } from './realtime-indicator'
 
 const navigation = [
   { name: 'דאשבורד', href: '/', icon: BarChart3 },
@@ -56,13 +57,16 @@ export function Navigation() {
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-center h-16 border-b border-gray-200/50 dark:border-gray-700/50">
+          <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200/50 dark:border-gray-700/50">
             <div className="flex items-center space-x-2 space-x-reverse">
               <TrendingUp className="h-8 w-8 text-blue-600" />
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">TradeMaster</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Pro</p>
               </div>
+            </div>
+            <div className="hidden lg:block">
+              <RealtimeIndicator />
             </div>
           </div>
 
