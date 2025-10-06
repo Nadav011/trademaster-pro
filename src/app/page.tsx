@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Navigation } from '@/components/layout/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
@@ -23,10 +23,22 @@ import {
   TradeWithCalculations, 
   Trade 
 } from '@/types'
-import { TrendingUp, BarChart3, RefreshCw } from 'lucide-react'
+import { TrendingUp, BarChart3, RefreshCw, Activity, DollarSign, Target, Clock } from 'lucide-react'
 
-export default function Dashboard() {
-  const [kpis, setKpis] = useState<DashboardKPIs>({
+// Dashboard state interface for better type safety
+interface DashboardState {
+  kpis: DashboardKPIs
+  openTrades: TradeWithCalculations[]
+  liveStockSymbols: string[]
+  isLoading: boolean
+  isLoadingPrices: boolean
+  error: string | null
+  lastUpdate: Date | null
+}
+
+// Initial state
+const initialDashboardState: DashboardState = {
+  kpis: {
     win_rate: 0,
     daily_change_percent: 0,
     daily_change_dollars: 0,
@@ -38,138 +50,160 @@ export default function Dashboard() {
     total_trades: 0,
     winning_trades: 0,
     losing_trades: 0,
-  })
-  const [openTrades, setOpenTrades] = useState<TradeWithCalculations[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [liveStockSymbols, setLiveStockSymbols] = useState<string[]>([])
-  const [isLoadingPrices, setIsLoadingPrices] = useState(false)
+  },
+  openTrades: [],
+  liveStockSymbols: [],
+  isLoading: true,
+  isLoadingPrices: false,
+  error: null,
+  lastUpdate: null,
+}
+
+export default function Dashboard() {
+  // Consolidated state management
+  const [dashboardState, setDashboardState] = useState<DashboardState>(initialDashboardState)
   const [priceCache, setPriceCache] = useState<Map<string, { data: any, timestamp: number }>>(new Map())
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Optimized state update function
+  const updateDashboardState = useCallback((updates: Partial<DashboardState>) => {
+    setDashboardState(prev => ({
+      ...prev,
+      ...updates,
+      lastUpdate: new Date()
+    }))
+  }, [])
 
   // Function to close a trade
-  const handleCloseTrade = async (tradeId: string) => {
+  const handleCloseTrade = useCallback(async (tradeId: string) => {
     try {
-      // Navigate to trade details page to close the trade
       window.location.href = `/trades/${tradeId}`
     } catch (error) {
       console.error('Failed to navigate to trade:', error)
     }
-  }
+  }, [])
 
+  // Optimized price loading with better caching and error handling
   const loadCurrentPrices = useCallback(async (trades: Trade[]) => {
-    try {
-      setIsLoadingPrices(true)
-      const symbols = [...new Set(trades.map(trade => trade.symbol))]
-      if (symbols.length === 0) {
-        setIsLoadingPrices(false)
-        return
-      }
+    if (trades.length === 0) return
 
-      // Check cache first and filter symbols that need fresh data
+    updateDashboardState({ isLoadingPrices: true })
+    
+    try {
+      const symbols = [...new Set(trades.map(trade => trade.symbol))]
       const now = Date.now()
-      const cacheTimeout = 5 * 60 * 1000 // 5 minutes cache (increased for better performance)
+      const cacheTimeout = 3 * 60 * 1000 // 3 minutes cache for better performance
       
+      // Filter symbols that need fresh data
       const symbolsToFetch = symbols.filter(symbol => {
         const cached = priceCache.get(symbol)
         return !cached || (now - cached.timestamp) > cacheTimeout
       })
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`📊 Fetching prices for ${symbolsToFetch.length} symbols (${symbols.length - symbolsToFetch.length} from cache)`)
+      if (symbolsToFetch.length === 0) {
+        // All data is cached, just update trades with cached prices
+        updateTradesWithCachedPrices(trades)
+        return
       }
 
-      // Get fresh prices only for symbols not in cache
-      const freshPrices = symbolsToFetch.length > 0 ? await Promise.allSettled(
+      // Fetch fresh prices with optimized batching
+      const freshPrices = await Promise.allSettled(
         symbolsToFetch.map(async (symbol) => {
           try {
-            // Add timeout to prevent hanging (reduced for better performance)
             const marketData = await Promise.race([
               finnhubAPI.getQuote(symbol),
               new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 3000)
+                setTimeout(() => reject(new Error('Timeout')), 2000)
               )
             ])
             return { symbol, data: marketData }
           } catch (error) {
-            console.error(`Failed to get price for ${symbol}:`, error)
+            console.warn(`Failed to get price for ${symbol}:`, error)
             return { symbol, data: null }
           }
         })
-      ).then(results => 
-        results.map(result => 
-          result.status === 'fulfilled' ? result.value : { symbol: 'unknown', data: null }
-        )
-      ) : []
+      )
 
       // Update cache with fresh prices
       const newCache = new Map(priceCache)
-      freshPrices.forEach(priceData => {
-        if (priceData.data) {
-          newCache.set(priceData.symbol, { data: priceData.data, timestamp: now })
+      freshPrices.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.data) {
+          newCache.set(result.value.symbol, { 
+            data: result.value.data, 
+            timestamp: now 
+          })
         }
       })
       setPriceCache(newCache)
 
-      // Combine cached and fresh prices
-      const allPrices = symbols.map(symbol => {
-        const cached = newCache.get(symbol)
-        if (cached) {
-          return { symbol, data: cached.data }
-        }
-        const fresh = freshPrices.find(p => p.symbol === symbol)
-        return fresh || { symbol, data: null }
-      })
-
-      // Update open trades with current prices (optimized for performance)
-      setOpenTrades(prevTrades => {
-        return prevTrades.map(trade => {
-          const priceData = allPrices.find(p => p.symbol === trade.symbol)
-          if (!priceData?.data) return trade
-
-          const currentPrice = priceData.data.price
-          const entryPrice = trade.entry_price
-          const positionSize = trade.position_size
-          const direction = trade.direction
-
-          // Calculate unrealized P&L (optimized calculation)
-          const priceDiff = direction === 'Long' ? currentPrice - entryPrice : entryPrice - currentPrice
-          const unrealizedPnl = priceDiff * positionSize
-
-          // Calculate R units (optimized calculation)
-          const riskPerShare = Math.abs(entryPrice - trade.planned_stop_loss)
-          const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * positionSize) : 0
-
-          return {
-            ...trade,
-            current_price: currentPrice,
-            daily_change: priceData.data.change,
-            unrealized_pnl: unrealizedPnl,
-            unrealized_r_units: unrealizedRUnits,
-            unrealized_percentage: (priceDiff / entryPrice) * 100,
-          }
-        })
-      })
+      // Update trades with all available prices
+      updateTradesWithPrices(trades, newCache)
+      
     } catch (error) {
       console.error('Failed to load current prices:', error)
     } finally {
-      setIsLoadingPrices(false)
+      updateDashboardState({ isLoadingPrices: false })
     }
-  }, [priceCache])
+  }, [priceCache, updateDashboardState])
 
-  const recalculateKPIsWithUpdatedPrices = async (updatedOpenTrades: TradeWithCalculations[]) => {
+  // Helper function to update trades with cached prices
+  const updateTradesWithCachedPrices = useCallback((trades: Trade[]) => {
+    const updatedTrades = trades.map(trade => {
+      const cached = priceCache.get(trade.symbol)
+      if (!cached?.data) return trade
+
+      return calculateTradeWithCurrentPrice(trade, cached.data)
+    })
+    
+    updateDashboardState({ openTrades: updatedTrades })
+  }, [priceCache, updateDashboardState])
+
+  // Helper function to update trades with all available prices
+  const updateTradesWithPrices = useCallback((trades: Trade[], cache: Map<string, any>) => {
+    const updatedTrades = trades.map(trade => {
+      const cached = cache.get(trade.symbol)
+      if (!cached?.data) return trade
+
+      return calculateTradeWithCurrentPrice(trade, cached.data)
+    })
+    
+    updateDashboardState({ openTrades: updatedTrades })
+  }, [updateDashboardState])
+
+  // Helper function to calculate trade with current price
+  const calculateTradeWithCurrentPrice = useCallback((trade: Trade, priceData: any) => {
+    const currentPrice = priceData.price
+    const entryPrice = trade.entry_price
+    const positionSize = trade.position_size
+    const direction = trade.direction
+
+    const priceDiff = direction === 'Long' ? currentPrice - entryPrice : entryPrice - currentPrice
+    const unrealizedPnl = priceDiff * positionSize
+    const riskPerShare = Math.abs(entryPrice - trade.planned_stop_loss)
+    const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * positionSize) : 0
+
+    return {
+      ...trade,
+      current_price: currentPrice,
+      daily_change: priceData.change,
+      unrealized_pnl: unrealizedPnl,
+      unrealized_r_units: unrealizedRUnits,
+      unrealized_percentage: (priceDiff / entryPrice) * 100,
+    }
+  }, [])
+
+  // Optimized KPI calculation with memoization
+  const calculateKPIs = useCallback(async (openTrades: TradeWithCalculations[] = []) => {
     try {
-      console.log('🔄 Updating KPIs with real-time prices...')
-      
-      // Get all trades again
       const allTrades = await tradeDatabase.findAll()
       const closedTrades = allTrades.filter(trade => trade.exit_price)
       
-      // Calculate KPIs with updated open trades
+      // Calculate basic metrics
       const winningClosedTrades = closedTrades.filter(trade => 
-        trade.result_dollars !== undefined && trade.result_dollars > 0
+        (trade.result_dollars || 0) > 0
       )
       const losingClosedTrades = closedTrades.filter(trade => 
-        trade.result_dollars !== undefined && trade.result_dollars < 0
+        (trade.result_dollars || 0) < 0
       )
 
       const totalWinningTrades = winningClosedTrades.length
@@ -193,192 +227,10 @@ export default function Dashboard() {
         return start
       }
 
-      // Calculate daily change for today's trades (both closed and open)
+      // Calculate daily and weekly changes
       const today = new Date().toDateString()
-      const todayClosedTrades = closedTrades.filter(trade => 
-        new Date(trade.exit_datetime || trade.datetime).toDateString() === today
-      )
-      const todayOpenTrades = updatedOpenTrades.filter(trade => 
-        new Date(trade.datetime).toDateString() === today
-      )
-
-      const dailyProfitLossClosed = todayClosedTrades.reduce((sum, trade) => 
-        sum + (trade.result_dollars || 0), 0
-      )
-      const dailyProfitLossOpen = todayOpenTrades.reduce((sum, trade) => {
-        return sum + (trade.unrealized_pnl || 0)
-      }, 0)
-
-      const dailyChangeDollars = dailyProfitLossClosed + dailyProfitLossOpen
-      
-      // Calculate weekly change for this week's trades (both closed and open)
       const startOfWeek = getStartOfWeek(new Date())
-      const weekClosedTrades = closedTrades.filter(trade => {
-        const tradeDate = new Date(trade.exit_datetime || trade.datetime)
-        return tradeDate >= startOfWeek
-      })
-      const weekOpenTrades = updatedOpenTrades.filter(trade => {
-        const tradeDate = new Date(trade.datetime)
-        return tradeDate >= startOfWeek
-      })
-
-      const weeklyProfitLossClosed = weekClosedTrades.reduce((sum, trade) => 
-        sum + (trade.result_dollars || 0), 0
-      )
-      const weeklyProfitLossOpen = weekOpenTrades.reduce((sum, trade) => {
-        return sum + (trade.unrealized_pnl || 0)
-      }, 0)
-
-      const weeklyChangeDollars = weeklyProfitLossClosed + weeklyProfitLossOpen
       
-      // Get total current capital for percentage calculations
-      let totalCurrentCapital = 0
-      try {
-        const capitalSummary = await capitalDatabase.getCapitalSummary()
-        totalCurrentCapital = capitalSummary.total_equity
-      // Optimized logging for performance
-      console.log('📊 Updated Capital Summary:', capitalSummary)
-      console.log('💰 Updated Total Current Capital:', totalCurrentCapital)
-      } catch (error) {
-        console.error('Failed to get capital summary:', error)
-        // Fallback: use base capital + closed P&L
-        const baseCapital = 10000 // Default base capital
-        totalCurrentCapital = baseCapital + totalProfitLossClosed
-        // Optimized logging for performance
-        // Optimized logging for performance
-        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
-      }
-      
-      // Calculate daily change percentage based on total capital
-      const dailyChangePercent = totalCurrentCapital > 0 
-        ? (dailyChangeDollars / totalCurrentCapital) * 100 
-        : 0
-      
-      // Calculate weekly change percentage based on total capital
-      const weeklyChangePercent = totalCurrentCapital > 0 
-        ? (weeklyChangeDollars / totalCurrentCapital) * 100 
-        : 0
-
-      // Optimized logging for performance
-      console.log('📈 Updated Change Calculations:')
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-      console.log('Daily change percent:', dailyChangePercent)
-      console.log('Weekly change percent:', weeklyChangePercent)
-
-      // Calculate open trades P&L with updated prices
-      const totalProfitLossOpen = updatedOpenTrades.reduce((sum, trade) => {
-        return sum + (trade.unrealized_pnl || 0)
-      }, 0)
-
-      const winRate = totalTradesForWinRate > 0 
-        ? (totalWinningTrades / totalTradesForWinRate) * 100 
-        : 0
-
-      const updatedKpis: DashboardKPIs = {
-        win_rate: winRate,
-        daily_change_percent: dailyChangePercent,
-        daily_change_dollars: dailyChangeDollars,
-        weekly_change_percent: weeklyChangePercent,
-        weekly_change_dollars: weeklyChangeDollars,
-        total_r: totalRUnits,
-        total_profit_loss_closed: totalProfitLossClosed,
-        total_profit_loss_open: totalProfitLossOpen,
-        total_trades: totalTradesForWinRate,
-        winning_trades: totalWinningTrades,
-        losing_trades: totalLosingTrades,
-      }
-
-      // Optimized logging for performance
-      console.log('📊 Final KPIs with real-time prices:')
-      console.log('Total profit/loss open:', totalProfitLossOpen)
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-
-      // Update KPIs with real-time data (debounced to prevent excessive updates)
-      setTimeout(() => {
-        setKpis(updatedKpis)
-      }, 500)
-    } catch (error) {
-      console.error('Error recalculating KPIs:', error)
-    }
-  }
-
-  const loadDashboardData = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      console.log('🚀 Loading dashboard data...')
-
-      // Initialize database if needed
-      await initializeDatabase()
-
-      // Set up Finnhub API key
-      const finnhubApiKey = apiConfig.getFinnhubApiKey()
-      if (finnhubApiKey) {
-        finnhubAPI.setApiKey(finnhubApiKey)
-      }
-
-      // Load all trades
-      const allTrades = await tradeDatabase.findAll()
-      const openTradesData = await tradeDatabase.getOpenTrades()
-
-      // Calculate KPIs - include both closed and open trades
-      const closedTrades = allTrades.filter(trade => trade.exit_price)
-      const openTrades = allTrades.filter(trade => !trade.exit_price)
-
-      // Don't show KPIs until we have complete data
-      if (allTrades.length === 0) {
-        setKpis({
-          win_rate: 0,
-          daily_change_percent: 0,
-          daily_change_dollars: 0,
-          weekly_change_percent: 0,
-          weekly_change_dollars: 0,
-          total_r: 0,
-          total_profit_loss_closed: 0,
-          total_profit_loss_open: 0,
-          total_trades: 0,
-          winning_trades: 0,
-          losing_trades: 0,
-        })
-        setIsLoading(false)
-        return
-      }
-      
-      // For closed trades
-      const winningClosedTrades = closedTrades.filter(trade => 
-        trade.result_dollars !== undefined && trade.result_dollars > 0
-      )
-      const losingClosedTrades = closedTrades.filter(trade => 
-        trade.result_dollars !== undefined && trade.result_dollars < 0
-      )
-
-      // For open trades, we'll calculate based on current prices if available
-      // For now, we'll only count closed trades for win rate to avoid confusion
-      const totalWinningTrades = winningClosedTrades.length
-      const totalLosingTrades = losingClosedTrades.length
-      const totalTradesForWinRate = closedTrades.length
-
-      const totalProfitLossClosed = closedTrades.reduce((sum, trade) => 
-        sum + (trade.result_dollars || 0), 0
-      )
-      const totalRUnits = closedTrades.reduce((sum, trade) => 
-        sum + (trade.result_r_units || 0), 0
-      )
-
-      // Helper function to get start of week (Sunday)
-      const getStartOfWeek = (date: Date) => {
-        const start = new Date(date)
-        const day = start.getDay()
-        const diff = start.getDate() - day
-        start.setDate(diff)
-        start.setHours(0, 0, 0, 0)
-        return start
-      }
-
-      // Calculate daily change for today's trades (both closed and open)
-      const today = new Date().toDateString()
       const todayClosedTrades = closedTrades.filter(trade => 
         new Date(trade.exit_datetime || trade.datetime).toDateString() === today
       )
@@ -386,22 +238,6 @@ export default function Dashboard() {
         new Date(trade.datetime).toDateString() === today
       )
 
-      const dailyProfitLossClosed = todayClosedTrades.reduce((sum, trade) => 
-        sum + (trade.result_dollars || 0), 0
-      )
-      const dailyProfitLossOpen = todayOpenTrades.reduce((sum, trade) => {
-        // Calculate unrealized P&L for open trades
-        const currentPrice = trade.current_price || trade.entry_price
-        const profitLoss = trade.direction === 'Long' 
-          ? (currentPrice - trade.entry_price) * trade.position_size
-          : (trade.entry_price - currentPrice) * trade.position_size
-        return sum + profitLoss
-      }, 0)
-
-      const dailyChangeDollars = dailyProfitLossClosed + dailyProfitLossOpen
-      
-      // Calculate weekly change for this week's trades (both closed and open)
-      const startOfWeek = getStartOfWeek(new Date())
       const weekClosedTrades = closedTrades.filter(trade => {
         const tradeDate = new Date(trade.exit_datetime || trade.datetime)
         return tradeDate >= startOfWeek
@@ -411,18 +247,21 @@ export default function Dashboard() {
         return tradeDate >= startOfWeek
       })
 
+      const dailyProfitLossClosed = todayClosedTrades.reduce((sum, trade) => 
+        sum + (trade.result_dollars || 0), 0
+      )
+      const dailyProfitLossOpen = todayOpenTrades.reduce((sum, trade) => 
+        sum + (trade.unrealized_pnl || 0), 0
+      )
+
       const weeklyProfitLossClosed = weekClosedTrades.reduce((sum, trade) => 
         sum + (trade.result_dollars || 0), 0
       )
-      const weeklyProfitLossOpen = weekOpenTrades.reduce((sum, trade) => {
-        // Calculate unrealized P&L for open trades
-        const currentPrice = trade.current_price || trade.entry_price
-        const profitLoss = trade.direction === 'Long' 
-          ? (currentPrice - trade.entry_price) * trade.position_size
-          : (trade.entry_price - currentPrice) * trade.position_size
-        return sum + profitLoss
-      }, 0)
+      const weeklyProfitLossOpen = weekOpenTrades.reduce((sum, trade) => 
+        sum + (trade.unrealized_pnl || 0), 0
+      )
 
+      const dailyChangeDollars = dailyProfitLossClosed + dailyProfitLossOpen
       const weeklyChangeDollars = weeklyProfitLossClosed + weeklyProfitLossOpen
       
       // Get total current capital for percentage calculations
@@ -430,56 +269,29 @@ export default function Dashboard() {
       try {
         const capitalSummary = await capitalDatabase.getCapitalSummary()
         totalCurrentCapital = capitalSummary.total_equity
-        console.log('📊 Capital Summary:', capitalSummary)
-        console.log('💰 Total Current Capital:', totalCurrentCapital)
       } catch (error) {
-        console.error('Failed to get capital summary:', error)
-        // Fallback: use base capital + closed P&L
-        const baseCapital = 10000 // Default base capital
+        console.warn('Failed to get capital summary, using fallback:', error)
+        const baseCapital = 10000
         totalCurrentCapital = baseCapital + totalProfitLossClosed
-        // Optimized logging for performance
-        // Optimized logging for performance
-        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
       }
       
-      // Calculate daily change percentage based on total capital
       const dailyChangePercent = totalCurrentCapital > 0 
         ? (dailyChangeDollars / totalCurrentCapital) * 100 
         : 0
       
-      // Calculate weekly change percentage based on total capital
       const weeklyChangePercent = totalCurrentCapital > 0 
         ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
 
-      console.log('📈 Change Calculations:')
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-      console.log('Daily change percent:', dailyChangePercent)
-      console.log('Weekly change percent:', weeklyChangePercent)
-
-      // Calculate open trades P&L - FIXED: Now properly calculates for all open trades
-      const totalProfitLossOpen = openTrades.reduce((sum, trade) => {
-        // Use current_price if available, otherwise use entry_price
-        const currentPrice = trade.current_price || trade.entry_price
-        const profitLoss = trade.direction === 'Long' 
-          ? (currentPrice - trade.entry_price) * trade.position_size
-          : (trade.entry_price - currentPrice) * trade.position_size
-        return sum + profitLoss
-      }, 0)
-
-      // Optimized logging for performance
-      if (openTrades.length > 0) {
-        console.log('🔍 Open trades P&L calculation:')
-        console.log('Open trades count:', openTrades.length)
-        console.log('Total profit/loss open:', totalProfitLossOpen)
-      }
+      const totalProfitLossOpen = openTrades.reduce((sum, trade) => 
+        sum + (trade.unrealized_pnl || 0), 0
+      )
 
       const winRate = totalTradesForWinRate > 0 
         ? (totalWinningTrades / totalTradesForWinRate) * 100 
         : 0
 
-      const calculatedKpis: DashboardKPIs = {
+      return {
         win_rate: winRate,
         daily_change_percent: dailyChangePercent,
         daily_change_dollars: dailyChangeDollars,
@@ -492,19 +304,34 @@ export default function Dashboard() {
         winning_trades: totalWinningTrades,
         losing_trades: totalLosingTrades,
       }
+    } catch (error) {
+      console.error('Error calculating KPIs:', error)
+      return initialDashboardState.kpis
+    }
+  }, [])
 
-      // Optimized logging for performance
-      console.log('📊 KPIs Debug:')
-      console.log('Open trades count:', openTrades.length)
-      console.log('Total profit/loss open:', totalProfitLossOpen)
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-
-      // Check if running on mobile and warn about data sync
-      const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      if (isMobile && allTrades.length === 0) {
-        setError('הנתונים לא מסונכרנים עם הנייד. אנא הוסף נתונים דרך הדסקטופ או לחץ על כפתור הרענון.')
+  // Optimized main data loading function
+  const loadDashboardData = useCallback(async () => {
+    try {
+      updateDashboardState({ isLoading: true, error: null })
+      
+      // Initialize database if needed
+      if (!isInitialized) {
+        await initializeDatabase()
+        setIsInitialized(true)
       }
+
+      // Set up Finnhub API key
+      const finnhubApiKey = apiConfig.getFinnhubApiKey()
+      if (finnhubApiKey) {
+        finnhubAPI.setApiKey(finnhubApiKey)
+      }
+
+      // Load all data in parallel for better performance
+      const [allTrades, openTradesData] = await Promise.all([
+        tradeDatabase.findAll(),
+        tradeDatabase.getOpenTrades()
+      ])
 
       // Convert open trades to TradeWithCalculations
       const openTradesWithCalculations: TradeWithCalculations[] = openTradesData.map(trade => ({
@@ -517,110 +344,85 @@ export default function Dashboard() {
         unrealized_percentage: undefined,
       }))
 
-      setOpenTrades(openTradesWithCalculations)
-
       // Extract unique symbols from open trades for live stocks
       const symbols = [...new Set(openTradesData.map(trade => trade.symbol))]
-      setLiveStockSymbols(symbols)
 
-      // Set KPIs only after all data is ready
-      setKpis(calculatedKpis)
-      setIsLoading(false)
+      // Calculate KPIs with current open trades
+      const calculatedKpis = await calculateKPIs(openTradesWithCalculations)
 
-      // Load current prices for open trades (only if API key is configured)
-      // This will only update the open trades display, not the KPIs
+      // Update all state at once for better performance
+      updateDashboardState({
+        kpis: calculatedKpis,
+        openTrades: openTradesWithCalculations,
+        liveStockSymbols: symbols,
+        isLoading: false,
+        error: null
+      })
+
+      // Load current prices in background if API key is available
       if (openTradesData.length > 0 && finnhubApiKey) {
-        console.log('🔄 Loading current prices for open trades display...')
-        // Load prices in background without blocking the UI
+        // Use setTimeout to prevent blocking the UI
         setTimeout(() => {
           loadCurrentPrices(openTradesData).catch(error => {
-            console.error('Background price loading failed:', error)
+            console.warn('Background price loading failed:', error)
           })
-        }, 500) // Reduced delay for faster loading
+        }, 100)
       }
 
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
-      setError('שגיאה בטעינת נתוני הדאשבורד')
-      setIsLoading(false)
+      updateDashboardState({ 
+        error: 'שגיאה בטעינת נתוני הדאשבורד',
+        isLoading: false 
+      })
     }
-  }, [loadCurrentPrices])
+  }, [isInitialized, calculateKPIs, loadCurrentPrices, updateDashboardState])
 
+  // Optimized useEffect with better performance
   useEffect(() => {
     loadDashboardData()
     
-    // Initialize auth listener for better localStorage management
+    // Initialize auth and sync in background
     const initializeAuth = async () => {
       try {
         const { initializeAuthListener, auth, startAutoSyncService } = await import('@/lib/supabase')
         
-        // Initialize the auth listener
         initializeAuthListener()
         
-        // Check current auth state
         const isAuthStateSaved = auth.isAuthStateSaved()
         const savedEmail = auth.getSavedUserEmail()
         
-        console.log('🔍 Checking auth state on page load...')
-        console.log('💾 Auth state saved:', isAuthStateSaved)
-        console.log('📧 Saved email:', savedEmail)
-        
         if (isAuthStateSaved && savedEmail) {
-          console.log('🔄 User should be authenticated, triggering auto-sync...')
-          
-          // Start auto-sync in background without blocking page load
+          // Start auto-sync in background
           const { triggerAutoSync } = await import('@/lib/supabase')
           triggerAutoSync().catch(console.error)
+          startAutoSyncService().catch(console.error)
           
-          // Start the daily auto-sync service for multi-device sync
-          console.log('🚀 Starting daily auto-sync service...')
-          startAutoSyncService().catch(console.error) // Daily sync (24 hours)
-          
-          // Reload dashboard data after a short delay (non-blocking)
-          setTimeout(() => {
-            loadDashboardData().catch(console.error)
-          }, 1000)
+          // Reload dashboard data after sync
+          setTimeout(loadDashboardData, 1000)
         } else {
-          console.log('⚠️ No saved auth state, but checking if user is authenticated...')
-          
-          // Check if user is actually authenticated even without localStorage
+          // Check if user is authenticated
           const { supabase } = await import('@/lib/supabase')
           const { data: { user }, error: authError } = await supabase.auth.getUser()
           
           if (user && !authError) {
-            console.log('✅ User is authenticated, saving state and triggering sync...')
-            
-            // Save auth state to localStorage
             localStorage.setItem('trademaster_auth_state', 'authenticated')
             localStorage.setItem('trademaster_user_email', user.email || '')
             localStorage.setItem('trademaster_user_id', user.id)
             
-            // Trigger sync immediately
             const { triggerAutoSync } = await import('@/lib/supabase')
             await triggerAutoSync()
-            console.log('✅ Auto-sync completed after fixing auth state')
-            
-            // Start auto-sync service
             await startAutoSyncService()
-            
-            // Reload dashboard data after sync
             setTimeout(loadDashboardData, 1000)
-          } else {
-            console.log('⚠️ User not authenticated, skipping auto-sync')
           }
         }
       } catch (error) {
-        console.error('❌ Auto-sync on load failed:', error)
+        console.error('Auto-sync initialization failed:', error)
       }
     }
     
-    // Auto-sync on page load
-    const autoSyncOnLoad = async () => {
-      await initializeAuth()
-    }
-    
-    // Run auto-sync after a short delay to ensure page is loaded
-    setTimeout(autoSyncOnLoad, 1000) // Reduced delay for faster sync
+    // Run auth initialization after a short delay
+    setTimeout(initializeAuth, 500)
     
     // Listen for sync events from other tabs
     const handleStorageChange = (e: StorageEvent) => {
@@ -628,7 +430,6 @@ export default function Dashboard() {
         try {
           const event = JSON.parse(e.newValue)
           if (event.type === 'DATA_SYNCED') {
-            console.log('📱 Data synced from another tab, reloading dashboard...')
             loadDashboardData()
           }
         } catch (error) {
@@ -639,55 +440,81 @@ export default function Dashboard() {
     
     window.addEventListener('storage', handleStorageChange)
     
-    // Auto-refresh dashboard data every 5 minutes (increased frequency for better sync)
-    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
-    
-    // Auto-refresh prices every 3 minutes (increased frequency for better sync)
+    // Auto-refresh intervals
+    const interval = setInterval(loadDashboardData, 5 * 60 * 1000) // 5 minutes
     const priceInterval = setInterval(async () => {
       const openTradesData = await tradeDatabase.getOpenTrades()
       const finnhubApiKey = apiConfig.getFinnhubApiKey()
       if (openTradesData.length > 0 && finnhubApiKey) {
-        console.log('🔄 Auto-refreshing prices...')
-        loadCurrentPrices(openTradesData).catch(error => {
-          console.error('Auto-refresh failed:', error)
-        })
+        loadCurrentPrices(openTradesData).catch(console.error)
       }
-    }, 3 * 60 * 1000)
+    }, 3 * 60 * 1000) // 3 minutes
     
     return () => {
       clearInterval(interval)
       clearInterval(priceInterval)
       window.removeEventListener('storage', handleStorageChange)
       
-      // Stop auto-sync service when component unmounts
       import('@/lib/supabase').then(({ stopAutoSyncService }) => {
         stopAutoSyncService()
       })
     }
   }, [loadDashboardData, loadCurrentPrices])
 
-  const handleTradeUpdate = (updatedTrades: TradeWithCalculations[]) => {
-    setOpenTrades(updatedTrades)
-    // Also refresh dashboard data when trades are updated
-    loadDashboardData()
-  }
+  // Optimized trade update handler
+  const handleTradeUpdate = useCallback((updatedTrades: TradeWithCalculations[]) => {
+    updateDashboardState({ openTrades: updatedTrades })
+    // Recalculate KPIs with updated trades
+    calculateKPIs(updatedTrades).then(kpis => {
+      updateDashboardState({ kpis })
+    })
+  }, [updateDashboardState, calculateKPIs])
 
-  if (error) {
+  // Memoized component props for better performance
+  const memoizedProps = useMemo(() => ({
+    kpis: dashboardState.kpis,
+    openTrades: dashboardState.openTrades,
+    liveStockSymbols: dashboardState.liveStockSymbols,
+    isLoading: dashboardState.isLoading,
+    isLoadingPrices: dashboardState.isLoadingPrices,
+    error: dashboardState.error,
+    onCloseTrade: handleCloseTrade,
+    onTradeUpdate: handleTradeUpdate
+  }), [dashboardState, handleCloseTrade, handleTradeUpdate])
+
+  // Error state component
+  if (dashboardState.error) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <Navigation />
         <main className="p-6">
-          <div className="max-w-7xl mx-auto">
-            <Card className="apple-card">
-              <CardContent className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <Card className="apple-card border-red-200 dark:border-red-800">
+              <CardContent className="p-8">
                 <div className="text-center">
-                  <div className="text-red-600 text-lg mb-4">{error}</div>
-                  <button 
-                    onClick={() => window.location.reload()} 
-                    className="apple-button"
-                  >
-                    רענן דף
-                  </button>
+                  <div className="w-16 h-16 mx-auto mb-6 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                    <Activity className="h-8 w-8 text-red-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    שגיאה בטעינת הנתונים
+                  </h2>
+                  <div className="text-red-600 text-lg mb-6">{dashboardState.error}</div>
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={loadDashboardData}
+                      className="apple-button bg-blue-500 hover:bg-blue-600"
+                    >
+                      <RefreshCw className="h-4 w-4 ml-2" />
+                      נסה שוב
+                    </Button>
+                    <Button 
+                      onClick={() => window.location.reload()} 
+                      variant="outline"
+                      className="mr-3"
+                    >
+                      רענן דף
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -698,250 +525,41 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <Navigation />
-      <main className="p-6 lg:mr-64">
-        <div className="max-w-7xl mx-auto space-y-8">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+      <main className="p-4 lg:p-6 lg:mr-64">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Enhanced Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="space-y-2">
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
                 דאשבורד מסחר
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm sm:text-base">
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
                 סקירה כללית של ביצועי המסחר שלך
               </p>
+              {dashboardState.lastUpdate && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  עודכן לאחרונה: {dashboardState.lastUpdate.toLocaleTimeString('he-IL')}
+                </p>
+              )}
             </div>
-            <div className="flex items-center justify-between sm:justify-end space-x-4 space-x-reverse">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const trades = await tradeDatabase.findAll()
-                  const capital = await capitalDatabase.getCapitalHistory()
-                  alert(`נתונים מקומיים:\nעסקאות: ${trades.length}\nרשומות הון: ${capital.length}`)
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">בדוק נתונים</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { supabase, auth } = await import('@/lib/supabase')
-                    const { data: { user }, error } = await supabase.auth.getUser()
-                    const isAuthStateSaved = auth.isAuthStateSaved()
-                    const savedEmail = auth.getSavedUserEmail()
-                    
-                    let message = 'סטטוס התחברות:\n'
-                    message += `שמור ב-localStorage: ${isAuthStateSaved ? 'כן' : 'לא'}\n`
-                    message += `אימייל שמור: ${savedEmail || 'אין'}\n`
-                    message += `Supabase מחובר: ${user ? 'כן' : 'לא'}\n`
-                    
-                    if (user) {
-                      message += `אימייל נוכחי: ${user.email}\n`
-                      message += `ID: ${user.id}\n\n`
-                      
-                      // If user is authenticated but not saved to localStorage, save it now
-                      if (!isAuthStateSaved) {
-                        localStorage.setItem('trademaster_auth_state', 'authenticated')
-                        localStorage.setItem('trademaster_user_email', user.email || '')
-                        localStorage.setItem('trademaster_user_id', user.id)
-                        message += '✅ מצב התחברות נשמר ל-localStorage!'
-                      } else {
-                        message += '✅ מצב התחברות שמור ב-localStorage'
-                      }
-                    }
-                    
-                    alert(message)
-                  } catch (error) {
-                    alert(`שגיאה: ${error}`)
-                  }
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">בדוק חיבור</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { dataSync } = await import('@/lib/supabase')
-                    const { supabase } = await import('@/lib/supabase')
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (!user) {
-                      alert('לא מחובר')
-                      return
-                    }
-                    
-                    const { data, error } = await dataSync.downloadUserData(user.id)
-                    if (error) {
-                      alert(`שגיאה: ${error.message}`)
-                    } else if (data) {
-                      alert(`נתונים בענן:\nעסקאות: ${data.trades?.length || 0}\nרשומות הון: ${data.capital?.length || 0}`)
-                    } else {
-                      alert('אין נתונים בענן')
-                    }
-                  } catch (error) {
-                    alert(`שגיאה: ${error}`)
-                  }
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">בדוק ענן</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    // Get local data first
-                    const localTrades = await tradeDatabase.findAll()
-                    const localCapital = await capitalDatabase.getCapitalHistory()
-                    
-                    alert(`נתונים מקומיים:\nעסקאות: ${localTrades.length}\nרשומות הון: ${localCapital.length}\n\nלחץ OK כדי לבצע סינכרון מפורט...`)
-                    
-                    // Perform detailed sync
-                    const { triggerAutoSync } = await import('@/lib/supabase')
-                    await triggerAutoSync()
-                    
-                    // Get data after sync
-                    const finalTrades = await tradeDatabase.findAll()
-                    const finalCapital = await capitalDatabase.getCapitalHistory()
-                    
-                    alert(`אחרי סינכרון:\nעסקאות: ${finalTrades.length}\nרשומות הון: ${finalCapital.length}\n\nשינויים:\nעסקאות: ${finalTrades.length - localTrades.length}\nרשומות הון: ${finalCapital.length - localCapital.length}`)
-                    
-                    // Reload dashboard
-                    loadDashboardData()
-                  } catch (error) {
-                    alert(`שגיאה: ${error}`)
-                  }
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">סינכרון מפורט</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  // Create sample data for testing
-                  const sampleTrade = {
-                    symbol: 'AAPL',
-                    direction: 'Long' as const,
-                    entry_price: 150,
-                    position_size: 100,
-                    datetime: new Date().toISOString(),
-                    exit_price: 155,
-                    exit_datetime: new Date(Date.now() + 86400000).toISOString(),
-                    result_dollars: 500,
-                    result_percent: 3.33,
-                    r_units: 1.5,
-                    stop_loss: 145,
-                    take_profit: 160,
-                    entry_reason: 'Breakout above resistance',
-                    emotional_state: 'Confident',
-                    market_timing: 'Market' as const,
-                    risk_level: 2 as const,
-                    planned_stop_loss: 145,
-                    emotional_entry: 'Confident' as const
-                  }
-                  
-                  const sampleCapital = {
-                    type: 'Deposit' as const,
-                    date: new Date().toISOString(),
-                    actual_datetime: new Date().toISOString(),
-                    amount: 10000,
-                    description: 'Initial capital deposit'
-                  }
-                  
-                  await tradesDb.create(sampleTrade)
-                  await capitalDb.create(sampleCapital)
-                  
-                  alert('נתונים לדוגמה נוצרו! לחץ על רענן כדי לראות אותם בדשבורד.')
-                  loadDashboardData()
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">נתונים לדוגמה</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    // Check authentication first
-                    const { supabase } = await import('@/lib/supabase')
-                    const { data: { user }, error: authError } = await supabase.auth.getUser()
-                    
-                    if (authError || !user) {
-                      alert(`שגיאת התחברות: ${authError?.message || 'לא מחובר'}`)
-                      return
-                    }
-                    
-                    console.log('🔄 Manual sync triggered for user:', user.email)
-                    alert('מבצע סינכרון... אנא המתן')
-                    
-                    const { triggerAutoSync } = await import('@/lib/supabase')
-                    await triggerAutoSync()
-                    
-                    // Reload dashboard data after sync
-                    setTimeout(loadDashboardData, 1000)
-                    alert('סינכרון הושלם בהצלחה!')
-                  } catch (error) {
-                    console.error('Manual sync failed:', error)
-                    alert(`שגיאה בסינכרון: ${error}`)
-                  }
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">סנכרן</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { isAutoSyncRunning, startAutoSyncService, stopAutoSyncService } = await import('@/lib/supabase')
-                    const isRunning = isAutoSyncRunning()
-                    
-                    if (isRunning) {
-                      stopAutoSyncService()
-                      alert('סינכרון יומי הופסק')
-                    } else {
-                      await startAutoSyncService()
-                      alert('סינכרון יומי הופעל (פעם ביום)')
-                    }
-                  } catch (error) {
-                    alert(`שגיאה: ${error}`)
-                  }
-                }}
-                className="flex items-center space-x-2 space-x-reverse"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">סינכרון אוטומטי</span>
-              </Button>
+            
+            {/* Enhanced Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={loadDashboardData}
-                disabled={isLoading}
+                disabled={dashboardState.isLoading}
                 className="flex items-center space-x-2 space-x-reverse"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">רענן</span>
+                <RefreshCw className={`h-4 w-4 ${dashboardState.isLoading ? 'animate-spin' : ''}`} />
+                <span>רענן</span>
               </Button>
+              
               <div className="flex items-center space-x-2 space-x-reverse text-sm text-gray-500 dark:text-gray-400">
-                <BarChart3 className="h-4 w-4" />
+                <Activity className="h-4 w-4" />
                 <span className="hidden sm:inline">TradeMaster Pro</span>
                 <span className="sm:hidden">TM Pro</span>
               </div>
@@ -949,30 +567,33 @@ export default function Dashboard() {
           </div>
 
           {/* KPI Cards */}
-          <KPICards kpis={kpis} isLoading={isLoading} />
+          <KPICards 
+            kpis={memoizedProps.kpis} 
+            isLoading={memoizedProps.isLoading} 
+          />
 
           {/* Stop Loss Alerts */}
           <StopLossAlerts />
 
           {/* Live Stocks */}
           <LiveStocks 
-            symbols={liveStockSymbols} 
-            openTrades={openTrades} 
-            onTradeUpdate={handleTradeUpdate}
+            symbols={memoizedProps.liveStockSymbols} 
+            openTrades={memoizedProps.openTrades} 
+            onTradeUpdate={memoizedProps.onTradeUpdate}
           />
 
           {/* Open Trades */}
           <OpenTrades 
-            trades={openTrades} 
-            isLoading={isLoading}
-            isLoadingPrices={isLoadingPrices}
-            onCloseTrade={handleCloseTrade}
+            trades={memoizedProps.openTrades} 
+            isLoading={memoizedProps.isLoading}
+            isLoadingPrices={memoizedProps.isLoadingPrices}
+            onCloseTrade={memoizedProps.onCloseTrade}
           />
 
-          {/* Additional Dashboard Sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Enhanced Dashboard Sections */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Performance Chart Placeholder */}
-            <Card className="apple-card">
+            <Card className="apple-card hover:shadow-xl transition-all duration-300">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 space-x-reverse">
                   <TrendingUp className="h-5 w-5 text-blue-600" />
@@ -980,16 +601,18 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="text-center p-4">
-                    <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400 mb-2">
+                <div className="h-64 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl">
+                  <div className="text-center p-6">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       תרשים ביצועים מצטברים
-                    </p>
-                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-3">
                       יציג את התפתחות ההון לאורך זמן
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
                       כולל הפקדות, משיכות ורווחים/הפסדים
                     </p>
                   </div>
@@ -998,21 +621,26 @@ export default function Dashboard() {
             </Card>
 
             {/* Top/Bottom Trades Placeholder */}
-            <Card className="apple-card">
+            <Card className="apple-card hover:shadow-xl transition-all duration-300">
               <CardHeader>
-                <CardTitle>עסקאות מובילות</CardTitle>
+                <CardTitle className="flex items-center space-x-2 space-x-reverse">
+                  <BarChart3 className="h-5 w-5 text-green-600" />
+                  <span>עסקאות מובילות</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="text-center p-4">
-                    <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400 mb-2">
+                <div className="h-64 flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl">
+                  <div className="text-center p-6">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                      <BarChart3 className="h-8 w-8 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       טבלת עסקאות מובילות
-                    </p>
-                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-3">
                       עסקאות הכי מרוויחות ומפסידות
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
                       כולל רווח/הפסד בדולרים ו-R units
                     </p>
                   </div>
