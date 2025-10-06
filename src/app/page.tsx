@@ -6,6 +6,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
 import { StopLossAlerts } from '@/components/dashboard/stop-loss-alerts'
 import { LiveStocks } from '@/components/dashboard/live-stocks'
+import { LiveUpdatesPanel } from '@/components/dashboard/live-updates-panel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
@@ -954,6 +955,11 @@ export default function Dashboard() {
           {/* Stop Loss Alerts */}
           <StopLossAlerts />
 
+          {/* Live Updates Panel - for mobile and desktop */}
+          <div className="lg:hidden">
+            <LiveUpdatesPanel />
+          </div>
+
           {/* Live Stocks */}
           <LiveStocks 
             symbols={liveStockSymbols} 
@@ -997,28 +1003,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Top/Bottom Trades Placeholder */}
-            <Card className="apple-card">
-              <CardHeader>
-                <CardTitle>עסקאות מובילות</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="text-center p-4">
-                    <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400 mb-2">
-                      טבלת עסקאות מובילות
-                    </p>
-                    <p className="text-sm text-gray-400 dark:text-gray-500">
-                      עסקאות הכי מרוויחות ומפסידות
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                      כולל רווח/הפסד בדולרים ו-R units
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Live Updates Panel - for desktop */}
+            <div className="hidden lg:block">
+              <LiveUpdatesPanel />
+            </div>
           </div>
         </div>
       </main>
