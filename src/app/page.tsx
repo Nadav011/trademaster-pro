@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigation } from '@/components/layout/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
@@ -44,7 +44,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [liveStockSymbols, setLiveStockSymbols] = useState<string[]>([])
   const [isLoadingPrices, setIsLoadingPrices] = useState(false)
-  const [priceCache, setPriceCache] = useState<Map<string, { data: any, timestamp: number }>>(new Map())
+  const priceCacheRef = useRef<Map<string, { data: any, timestamp: number }>>(new Map())
 
   // Function to close a trade
   const handleCloseTrade = async (tradeId: string) => {
@@ -70,7 +70,7 @@ export default function Dashboard() {
       const cacheTimeout = 5 * 60 * 1000 // 5 minutes cache (increased for better performance)
       
       const symbolsToFetch = symbols.filter(symbol => {
-        const cached = priceCache.get(symbol)
+        const cached = priceCacheRef.current.get(symbol)
         return !cached || (now - cached.timestamp) > cacheTimeout
       })
 
@@ -102,13 +102,13 @@ export default function Dashboard() {
       ) : []
 
       // Update cache with fresh prices
-      const newCache = new Map(priceCache)
+      const newCache = new Map(priceCacheRef.current)
       freshPrices.forEach(priceData => {
         if (priceData.data) {
           newCache.set(priceData.symbol, { data: priceData.data, timestamp: now })
         }
       })
-      setPriceCache(newCache)
+      priceCacheRef.current = newCache
 
       // Combine cached and fresh prices
       const allPrices = symbols.map(symbol => {
@@ -154,7 +154,7 @@ export default function Dashboard() {
     } finally {
       setIsLoadingPrices(false)
     }
-  }, [priceCache])
+  }, [])
 
   const recalculateKPIsWithUpdatedPrices = async (updatedOpenTrades: TradeWithCalculations[]) => {
     try {
