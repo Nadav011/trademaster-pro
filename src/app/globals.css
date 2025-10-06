@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import mobile optimizations */
+@import '../components/mobile/mobile-optimizations.css';
+
 /* CSS Reset */
 @layer base {
   html, body, div, span, applet, object, iframe,

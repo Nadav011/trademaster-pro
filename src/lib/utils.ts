@@ -48,6 +48,15 @@ export function formatDateOnly(date: string | Date): string {
   }).format(d);
 }
 
+export function formatTime(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('he-IL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(d);
+}
+
 export function getProfitLossColor(amount: number): string {
   if (amount > 0) return 'text-green-600 dark:text-green-400';
   if (amount < 0) return 'text-red-600 dark:text-red-400';
