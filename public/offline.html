@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>לא מחובר - TradeMaster Pro</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      direction: rtl;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .offline-container {
+      max-width: 400px;
+      width: 100%;
+      padding: 2rem;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+
+    .offline-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    p {
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-connected .status-dot {
+      background: #10b981;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .features-list {
+      text-align: right;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .features-list h3 {
+      font-size: 1.125rem;
+      margin-bottom: 1rem;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .features-list ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features-list li {
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .features-list li::before {
+      content: "✓";
+      color: #10b981;
+      font-weight: bold;
+      margin-left: 0.5rem;
+    }
+
+    @media (max-width: 480px) {
+      .offline-container {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+
+      .offline-icon {
+        font-size: 3rem;
+      }
+
+      h1 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="offline-icon">📱</div>
+
+    <h1>לא מחובר לאינטרנט</h1>
+
+    <p>נראה שאין לך חיבור לאינטרנט כרגע. אבל אל דאגה! TradeMaster Pro עובד במצב לא מקוון ויסנכרן את הנתונים כשחיבור האינטרנט יחזור.</p>
+
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      <span>מצב לא מקוון</span>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="retryConnection()">
+        נסה שוב
+      </button>
+      <a href="/" class="btn btn-secondary">
+        עבור לדף הבית
+      </a>
+    </div>
+
+    <div class="features-list">
+      <h3>מה אפשר לעשות במצב לא מקוון:</h3>
+      <ul>
+        <li>צפייה בעסקאות שמורות</li>
+        <li>הוספת עסקאות חדשות (יסנכרנו אוטומטית)</li>
+        <li>צפייה בגרפים וביצועים</li>
+        <li>גישה לכל הנתונים המקומיים</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Check network status
+    function updateConnectionStatus() {
+      const statusIndicator = document.querySelector('.status-indicator')
+      const statusDot = document.querySelector('.status-dot')
+
+      if (navigator.onLine) {
+        statusIndicator.innerHTML = `
+          <div class="status-dot"></div>
+          <span>מחובר לאינטרנט</span>
+        `
+        statusIndicator.classList.add('status-connected')
+
+        // Auto redirect if back online
+        setTimeout(() => {
+          if (navigator.onLine) {
+            window.location.href = '/'
+          }
+        }, 2000)
+      } else {
+        statusIndicator.innerHTML = `
+          <div class="status-dot"></div>
+          <span>מצב לא מקוון</span>
+        `
+        statusIndicator.classList.remove('status-connected')
+      }
+    }
+
+    function retryConnection() {
+      if (navigator.onLine) {
+        window.location.href = '/'
+      } else {
+        updateConnectionStatus()
+        // Try to trigger a network request to check connectivity
+        fetch('/', { method: 'HEAD', cache: 'no-cache' })
+          .then(() => {
+            if (navigator.onLine) {
+              window.location.href = '/'
+            }
+          })
+          .catch(() => {
+            setTimeout(updateConnectionStatus, 1000)
+          })
+      }
+    }
+
+    // Listen for network status changes
+    window.addEventListener('online', updateConnectionStatus)
+    window.addEventListener('offline', updateConnectionStatus)
+
+    // Initialize status
+    updateConnectionStatus()
+
+    // Check connection every 5 seconds
+    setInterval(updateConnectionStatus, 5000)
+
+    // Register service worker if not already registered
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered successfully:', registration)
+        })
+        .catch((error) => {
+          console.log('Service Worker registration failed:', error)
+        })
+    }
+  </script>
+</body>
+</html>
