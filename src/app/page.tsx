@@ -6,6 +6,8 @@ import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
 import { StopLossAlerts } from '@/components/dashboard/stop-loss-alerts'
 import { LiveStocks } from '@/components/dashboard/live-stocks'
+import { QuickActionsWidget } from '@/components/mobile/quick-actions-widget'
+import { MobileNotifications } from '@/components/mobile/mobile-notifications'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
@@ -700,6 +702,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen">
       <Navigation />
+      <MobileNotifications />
       <main className="p-6 lg:mr-64">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
@@ -950,6 +953,11 @@ export default function Dashboard() {
 
           {/* KPI Cards */}
           <KPICards kpis={kpis} isLoading={isLoading} />
+
+          {/* Mobile Quick Actions Widget - visible on mobile/tablet */}
+          <div className="lg:hidden">
+            <QuickActionsWidget />
+          </div>
 
           {/* Stop Loss Alerts */}
           <StopLossAlerts />
