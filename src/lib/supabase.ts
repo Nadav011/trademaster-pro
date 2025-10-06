@@ -303,7 +303,7 @@ export class SyncManager {
 
   async autoSync() {
     if (!this.syncStatus.isOnline || this.syncStatus.isSyncing) {
-      console.log('⚠️ Auto-sync skipped - offline or already syncing')
+      // Auto-sync skipped - offline or already syncing
       return
     }
 
@@ -315,22 +315,19 @@ export class SyncManager {
 
       const user = await auth.getCurrentUser()
       if (!user) {
-        console.log('⚠️ Auto-sync skipped - user not authenticated')
+        // Auto-sync skipped - user not authenticated
         this.syncStatus.error = 'User not authenticated'
         return
       }
       
       // Add timeout to prevent hanging
       syncTimeout = setTimeout(() => {
-        console.log('⏰ Auto-sync timeout, stopping sync')
+        // Auto-sync timeout, stopping sync
         this.syncStatus.isSyncing = false
         this.syncStatus.error = 'Sync timeout'
       }, 30000) // 30 second timeout
       
-      console.log('✅ User authenticated for auto-sync:', user.id)
-      console.log('🔍 User email:', user.email)
-
-      console.log('🔄 Auto-syncing data...')
+      // User authenticated for auto-sync
       
       // Import the database client
       const { tradeDatabase, capitalDatabase, tradesDb, capitalDb } = await import('./database-client')
@@ -339,13 +336,10 @@ export class SyncManager {
       const localTrades = await tradeDatabase.findAll()
       const localCapital = await capitalDatabase.getCapitalHistory()
       
-      console.log('📊 Local data before sync:', {
-        trades: localTrades.length,
-        capital: localCapital.length
-      })
+      // Local data loaded
       
       // Upload local data to Supabase
-      console.log('📤 Uploading local data...')
+      // Uploading local data
       const { data: uploadResult, error: uploadError } = await dataSync.uploadUserData(user.id, localTrades, localCapital)
       
       if (uploadError) {
@@ -366,30 +360,16 @@ export class SyncManager {
         return
       }
       
-      console.log('📥 Download result:', {
-        hasData: !!cloudData,
-        tradesCount: cloudData?.trades?.length || 0,
-        capitalCount: cloudData?.capital?.length || 0
-      })
+      // Download completed
       
       if (cloudData) {
-        console.log('🔄 Merging cloud data with local data...')
-        console.log('📊 Cloud data summary:', {
-          trades: cloudData.trades?.length || 0,
-          capital: cloudData.capital?.length || 0
-        })
-        console.log('📊 Local data summary:', {
-          trades: localTrades.length,
-          capital: localCapital.length
-        })
+        // Merging cloud data with local data
         
         // Merge trades - use smart merge to prevent duplicates
         const cloudTrades = cloudData.trades || []
         const localTradesMap = new Map(localTrades.map(t => [t.id, t]))
         
-        console.log('🔍 Smart merging trades from cloud...')
-        console.log('🔍 Local trades count:', localTrades.length)
-        console.log('🔍 Cloud trades count:', cloudTrades.length)
+        // Smart merging trades from cloud
         
         let newTradesAdded = 0
         let tradesUpdated = 0
@@ -399,11 +379,11 @@ export class SyncManager {
           
           if (!localTrade) {
             // Trade doesn't exist locally - add it
-            console.log('➕ Adding new trade from cloud:', cloudTrade.id, cloudTrade.symbol)
+            // Adding new trade from cloud
             try {
               await tradesDb.create(cloudTrade)
               newTradesAdded++
-              console.log('✅ Trade added successfully:', cloudTrade.id)
+              // Trade added successfully
             } catch (createError) {
               console.error('❌ Failed to add trade:', createError)
             }
@@ -504,9 +484,9 @@ export class SyncManager {
       })
       
       if (tradesChanged || capitalChanged) {
-        console.log('✅ Sync successful - data was updated')
+        // Sync successful - data was updated
       } else {
-        console.log('⚠️ Sync completed but no data changes detected')
+        // Sync completed but no data changes detected
       }
       
       this.syncStatus.lastSync = new Date()
@@ -640,7 +620,7 @@ class AutoSyncService {
       const existingTrades = await tradesDb.findAll()
       const existingCapital = await capitalDb.findAll()
       
-      console.log('🔍 Smart merging cloud data - existing trades:', existingTrades.length, 'existing capital:', existingCapital.length)
+      // Smart merging cloud data
       
       // Smart merge trades
       const existingTradesMap = new Map(existingTrades.map(t => [t.id, t]))
