@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigation } from '@/components/layout/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
@@ -44,7 +44,13 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [liveStockSymbols, setLiveStockSymbols] = useState<string[]>([])
   const [isLoadingPrices, setIsLoadingPrices] = useState(false)
-  const [priceCache, setPriceCache] = useState<Map<string, { data: any, timestamp: number }>>(new Map())
+  // Use a ref to keep a stable cache that does not recreate callbacks/effects
+  const priceCacheRef = useRef<Map<string, { data: any; timestamp: number }>>(new Map())
+  // Local state to trigger re-render when cache changes
+  const [priceCacheVersion, setPriceCacheVersion] = useState(0)
+  // Prevent overlapping reloads and coalesce rapid triggers
+  const isLoadingDataRef = useRef(false)
+  const lastLoadRef = useRef(0)
 
   // Function to close a trade
   const handleCloseTrade = async (tradeId: string) => {
@@ -70,7 +76,7 @@ export default function Dashboard() {
       const cacheTimeout = 5 * 60 * 1000 // 5 minutes cache (increased for better performance)
       
       const symbolsToFetch = symbols.filter(symbol => {
-        const cached = priceCache.get(symbol)
+        const cached = priceCacheRef.current.get(symbol)
         return !cached || (now - cached.timestamp) > cacheTimeout
       })
 
@@ -102,13 +108,15 @@ export default function Dashboard() {
       ) : []
 
       // Update cache with fresh prices
-      const newCache = new Map(priceCache)
+      const newCache = new Map(priceCacheRef.current)
       freshPrices.forEach(priceData => {
         if (priceData.data) {
           newCache.set(priceData.symbol, { data: priceData.data, timestamp: now })
         }
       })
-      setPriceCache(newCache)
+      priceCacheRef.current = newCache
+      // Bump version to trigger UI re-render without changing callback identities
+      setPriceCacheVersion(v => v + 1)
 
       // Combine cached and fresh prices
       const allPrices = symbols.map(symbol => {
@@ -154,7 +162,7 @@ export default function Dashboard() {
     } finally {
       setIsLoadingPrices(false)
     }
-  }, [priceCache])
+  }, [])
 
   const recalculateKPIsWithUpdatedPrices = async (updatedOpenTrades: TradeWithCalculations[]) => {
     try {
@@ -306,6 +314,13 @@ export default function Dashboard() {
 
   const loadDashboardData = useCallback(async () => {
     try {
+      const now = Date.now()
+      if (isLoadingDataRef.current || now - lastLoadRef.current < 1000) {
+        // Skip if a load is in progress or ran very recently
+        return
+      }
+      isLoadingDataRef.current = true
+      lastLoadRef.current = now
       setIsLoading(true)
       setError(null)
       console.log('🚀 Loading dashboard data...')
@@ -544,6 +559,9 @@ export default function Dashboard() {
       setError('שגיאה בטעינת נתוני הדאשבורד')
       setIsLoading(false)
     }
+    finally {
+      isLoadingDataRef.current = false
+    }
   }, [loadCurrentPrices])
 
   useEffect(() => {
@@ -664,7 +682,7 @@ export default function Dashboard() {
         stopAutoSyncService()
       })
     }
-  }, [loadDashboardData, loadCurrentPrices])
+  }, [loadDashboardData])
 
   const handleTradeUpdate = (updatedTrades: TradeWithCalculations[]) => {
     setOpenTrades(updatedTrades)
@@ -683,7 +701,7 @@ export default function Dashboard() {
                 <div className="text-center">
                   <div className="text-red-600 text-lg mb-4">{error}</div>
                   <button 
-                    onClick={() => window.location.reload()} 
+                    onClick={() => { setError(null); setIsLoading(true); loadDashboardData(); }} 
                     className="apple-button"
                   >
                     רענן דף

@@ -54,8 +54,20 @@ export class DataManager {
       localStorage.setItem('trademaster_emotionalStates', JSON.stringify(data.emotionalStates));
       localStorage.setItem('trademaster_users', JSON.stringify(data.users));
 
-      // Trigger page reload to apply changes
-      window.location.reload();
+      // Instead of a hard reload, notify other tabs and let the UI react
+      try {
+        const event = {
+          type: 'DATA_SYNCED',
+          timestamp: Date.now(),
+          message: 'Data imported locally'
+        }
+        localStorage.setItem('trademaster_sync_event', JSON.stringify(event))
+        setTimeout(() => {
+          localStorage.removeItem('trademaster_sync_event')
+        }, 1000)
+      } catch {
+        // no-op if localStorage fails
+      }
     } catch (error) {
       throw new Error(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

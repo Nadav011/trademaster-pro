@@ -84,10 +84,21 @@ export function SyncManagerComponent({ onSyncComplete }: SyncManagerProps) {
     // Check authentication status
     checkAuthStatus()
     
-    // Set up sync status updates
+    // Throttle status updates to reduce re-renders
     const interval = setInterval(() => {
-      setSyncStatus(syncManager.getStatus())
-    }, 1000)
+      setSyncStatus(prev => {
+        const next = syncManager.getStatus()
+        if (
+          prev.isOnline !== next.isOnline ||
+          prev.isSyncing !== next.isSyncing ||
+          prev.error !== next.error ||
+          (prev.lastSync?.toString() || '') !== (next.lastSync?.toString() || '')
+        ) {
+          return next
+        }
+        return prev
+      })
+    }, 1500)
 
     return () => clearInterval(interval)
   }, [checkAuthStatus])
