@@ -5,6 +5,12 @@ export const metadata: Metadata = {
   title: 'TradeMaster Pro - יומן מסחר מקצועי',
   description: 'יומן מסחר מקיף ומקצועי לסוחרים - ניתוח ביצועים, מעקב אחר עסקאות וניהול סיכונים',
   keywords: ['מסחר', 'יומן מסחר', 'ניתוח ביצועים', 'ניהול סיכונים', 'פיננסים'],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TradeMaster Pro'
+  }
 }
 
 export const viewport: Viewport = {
