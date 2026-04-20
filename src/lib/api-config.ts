@@ -33,8 +33,20 @@ export const apiConfig = {
 
   // Get Finnhub API key
   getFinnhubApiKey(): string {
-    const config = this.get()
-    return config?.finnhubApiKey || ''
+    // First check localStorage (client-side only)
+    if (typeof window !== 'undefined') {
+      const config = this.get()
+      if (config?.finnhubApiKey) {
+        return config.finnhubApiKey
+      }
+    }
+    
+    // Fallback to environment variable (works on both client and server)
+    if (process.env.NEXT_PUBLIC_FINNHUB_API_KEY) {
+      return process.env.NEXT_PUBLIC_FINNHUB_API_KEY
+    }
+    
+    return ''
   },
 
   // Set Finnhub API key
