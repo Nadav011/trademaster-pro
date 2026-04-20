@@ -74,9 +74,7 @@ export default function Dashboard() {
         return !cached || (now - cached.timestamp) > cacheTimeout
       })
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`📊 Fetching prices for ${symbolsToFetch.length} symbols (${symbols.length - symbolsToFetch.length} from cache)`)
-      }
+      // Fetching prices for symbols
 
       // Get fresh prices only for symbols not in cache
       const freshPrices = symbolsToFetch.length > 0 ? await Promise.allSettled(
@@ -158,7 +156,7 @@ export default function Dashboard() {
 
   const recalculateKPIsWithUpdatedPrices = async (updatedOpenTrades: TradeWithCalculations[]) => {
     try {
-      console.log('🔄 Updating KPIs with real-time prices...')
+      // Updating KPIs with real-time prices
       
       // Get all trades again
       const allTrades = await tradeDatabase.findAll()
@@ -236,17 +234,13 @@ export default function Dashboard() {
       try {
         const capitalSummary = await capitalDatabase.getCapitalSummary()
         totalCurrentCapital = capitalSummary.total_equity
-      // Optimized logging for performance
-      console.log('📊 Updated Capital Summary:', capitalSummary)
-      console.log('💰 Updated Total Current Capital:', totalCurrentCapital)
+      // Removed excessive logging
       } catch (error) {
         console.error('Failed to get capital summary:', error)
         // Fallback: use base capital + closed P&L
         const baseCapital = 10000 // Default base capital
         totalCurrentCapital = baseCapital + totalProfitLossClosed
-        // Optimized logging for performance
-        // Optimized logging for performance
-        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
+        // Using fallback capital calculation
       }
       
       // Calculate daily change percentage based on total capital
@@ -259,12 +253,7 @@ export default function Dashboard() {
         ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
 
-      // Optimized logging for performance
-      console.log('📈 Updated Change Calculations:')
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-      console.log('Daily change percent:', dailyChangePercent)
-      console.log('Weekly change percent:', weeklyChangePercent)
+      // Change calculations completed
 
       // Calculate open trades P&L with updated prices
       const totalProfitLossOpen = updatedOpenTrades.reduce((sum, trade) => {
@@ -289,16 +278,10 @@ export default function Dashboard() {
         losing_trades: totalLosingTrades,
       }
 
-      // Optimized logging for performance
-      console.log('📊 Final KPIs with real-time prices:')
-      console.log('Total profit/loss open:', totalProfitLossOpen)
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
+      // KPIs updated with real-time prices
 
-      // Update KPIs with real-time data (debounced to prevent excessive updates)
-      setTimeout(() => {
-        setKpis(updatedKpis)
-      }, 500)
+      // Update KPIs immediately
+      setKpis(updatedKpis)
     } catch (error) {
       console.error('Error recalculating KPIs:', error)
     }
@@ -308,7 +291,7 @@ export default function Dashboard() {
     try {
       setIsLoading(true)
       setError(null)
-      console.log('🚀 Loading dashboard data...')
+      // Loading dashboard data
 
       // Initialize database if needed
       await initializeDatabase()
@@ -430,16 +413,13 @@ export default function Dashboard() {
       try {
         const capitalSummary = await capitalDatabase.getCapitalSummary()
         totalCurrentCapital = capitalSummary.total_equity
-        console.log('📊 Capital Summary:', capitalSummary)
-        console.log('💰 Total Current Capital:', totalCurrentCapital)
+      // Capital summary loaded
       } catch (error) {
         console.error('Failed to get capital summary:', error)
         // Fallback: use base capital + closed P&L
         const baseCapital = 10000 // Default base capital
         totalCurrentCapital = baseCapital + totalProfitLossClosed
-        // Optimized logging for performance
-        // Optimized logging for performance
-        console.log('⚠️ Using fallback capital calculation:', totalCurrentCapital)
+        // Using fallback capital calculation
       }
       
       // Calculate daily change percentage based on total capital
@@ -452,11 +432,7 @@ export default function Dashboard() {
         ? (weeklyChangeDollars / totalCurrentCapital) * 100 
         : 0
 
-      console.log('📈 Change Calculations:')
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
-      console.log('Daily change percent:', dailyChangePercent)
-      console.log('Weekly change percent:', weeklyChangePercent)
+      // Change calculations completed
 
       // Calculate open trades P&L - FIXED: Now properly calculates for all open trades
       const totalProfitLossOpen = openTrades.reduce((sum, trade) => {
@@ -468,12 +444,7 @@ export default function Dashboard() {
         return sum + profitLoss
       }, 0)
 
-      // Optimized logging for performance
-      if (openTrades.length > 0) {
-        console.log('🔍 Open trades P&L calculation:')
-        console.log('Open trades count:', openTrades.length)
-        console.log('Total profit/loss open:', totalProfitLossOpen)
-      }
+      // Open trades P&L calculated
 
       const winRate = totalTradesForWinRate > 0 
         ? (totalWinningTrades / totalTradesForWinRate) * 100 
@@ -493,12 +464,7 @@ export default function Dashboard() {
         losing_trades: totalLosingTrades,
       }
 
-      // Optimized logging for performance
-      console.log('📊 KPIs Debug:')
-      console.log('Open trades count:', openTrades.length)
-      console.log('Total profit/loss open:', totalProfitLossOpen)
-      console.log('Daily change dollars:', dailyChangeDollars)
-      console.log('Weekly change dollars:', weeklyChangeDollars)
+      // KPIs calculated
 
       // Check if running on mobile and warn about data sync
       const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -530,13 +496,11 @@ export default function Dashboard() {
       // Load current prices for open trades (only if API key is configured)
       // This will only update the open trades display, not the KPIs
       if (openTradesData.length > 0 && finnhubApiKey) {
-        console.log('🔄 Loading current prices for open trades display...')
-        // Load prices in background without blocking the UI
-        setTimeout(() => {
-          loadCurrentPrices(openTradesData).catch(error => {
-            console.error('Background price loading failed:', error)
-          })
-        }, 500) // Reduced delay for faster loading
+        // Loading current prices for open trades display
+        // Load prices immediately
+        loadCurrentPrices(openTradesData).catch(error => {
+          console.error('Background price loading failed:', error)
+        })
       }
 
     } catch (err) {
@@ -561,34 +525,30 @@ export default function Dashboard() {
         const isAuthStateSaved = auth.isAuthStateSaved()
         const savedEmail = auth.getSavedUserEmail()
         
-        console.log('🔍 Checking auth state on page load...')
-        console.log('💾 Auth state saved:', isAuthStateSaved)
-        console.log('📧 Saved email:', savedEmail)
+        // Checking auth state on page load
         
         if (isAuthStateSaved && savedEmail) {
-          console.log('🔄 User should be authenticated, triggering auto-sync...')
+          // User should be authenticated, triggering auto-sync
           
           // Start auto-sync in background without blocking page load
           const { triggerAutoSync } = await import('@/lib/supabase')
           triggerAutoSync().catch(console.error)
           
           // Start the daily auto-sync service for multi-device sync
-          console.log('🚀 Starting daily auto-sync service...')
+          // Starting daily auto-sync service
           startAutoSyncService().catch(console.error) // Daily sync (24 hours)
           
-          // Reload dashboard data after a short delay (non-blocking)
-          setTimeout(() => {
-            loadDashboardData().catch(console.error)
-          }, 1000)
+          // Reload dashboard data immediately
+          loadDashboardData().catch(console.error)
         } else {
-          console.log('⚠️ No saved auth state, but checking if user is authenticated...')
+          // No saved auth state, checking if user is authenticated
           
           // Check if user is actually authenticated even without localStorage
           const { supabase } = await import('@/lib/supabase')
           const { data: { user }, error: authError } = await supabase.auth.getUser()
           
           if (user && !authError) {
-            console.log('✅ User is authenticated, saving state and triggering sync...')
+            // User is authenticated, saving state and triggering sync
             
             // Save auth state to localStorage
             localStorage.setItem('trademaster_auth_state', 'authenticated')
@@ -598,15 +558,15 @@ export default function Dashboard() {
             // Trigger sync immediately
             const { triggerAutoSync } = await import('@/lib/supabase')
             await triggerAutoSync()
-            console.log('✅ Auto-sync completed after fixing auth state')
+            // Auto-sync completed after fixing auth state
             
             // Start auto-sync service
             await startAutoSyncService()
             
-            // Reload dashboard data after sync
-            setTimeout(loadDashboardData, 1000)
+            // Reload dashboard data immediately
+            loadDashboardData()
           } else {
-            console.log('⚠️ User not authenticated, skipping auto-sync')
+            // User not authenticated, skipping auto-sync
           }
         }
       } catch (error) {
@@ -619,8 +579,8 @@ export default function Dashboard() {
       await initializeAuth()
     }
     
-    // Run auto-sync after a short delay to ensure page is loaded
-    setTimeout(autoSyncOnLoad, 1000) // Reduced delay for faster sync
+    // Run auto-sync immediately
+    autoSyncOnLoad()
     
     // Listen for sync events from other tabs
     const handleStorageChange = (e: StorageEvent) => {
@@ -628,7 +588,7 @@ export default function Dashboard() {
         try {
           const event = JSON.parse(e.newValue)
           if (event.type === 'DATA_SYNCED') {
-            console.log('📱 Data synced from another tab, reloading dashboard...')
+            // Data synced from another tab, reloading dashboard
             loadDashboardData()
           }
         } catch (error) {
@@ -647,7 +607,7 @@ export default function Dashboard() {
       const openTradesData = await tradeDatabase.getOpenTrades()
       const finnhubApiKey = apiConfig.getFinnhubApiKey()
       if (openTradesData.length > 0 && finnhubApiKey) {
-        console.log('🔄 Auto-refreshing prices...')
+        // Auto-refreshing prices
         loadCurrentPrices(openTradesData).catch(error => {
           console.error('Auto-refresh failed:', error)
         })
@@ -887,7 +847,7 @@ export default function Dashboard() {
                       return
                     }
                     
-                    console.log('🔄 Manual sync triggered for user:', user.email)
+                    // Manual sync triggered
                     alert('מבצע סינכרון... אנא המתן')
                     
                     const { triggerAutoSync } = await import('@/lib/supabase')
