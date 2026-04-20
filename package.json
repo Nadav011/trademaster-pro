@@ -10,7 +10,8 @@
     "setup": "node scripts/setup.js",
     "start-app": "node scripts/start.js",
     "deploy": "npm run build",
-    "preview": "npm run build && npm run start"
+    "preview": "npm run build && npm run start",
+    "preview-url": "node scripts/get-preview-url.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.0.5",
