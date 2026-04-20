@@ -11,7 +11,8 @@ import {
   TrendingUp,
   Menu,
   X,
-  Database
+  Database,
+  Activity
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'הוסף עסקה', href: '/add-trade', icon: Plus },
   { name: 'רשימת עסקאות', href: '/trades', icon: List },
   { name: 'ניהול הון', href: '/capital', icon: DollarSign },
+  { name: 'מעקב שינויים', href: '/changes', icon: Activity },
   { name: 'ניהול נתונים', href: '/data-management', icon: Database },
   { name: 'הגדרות', href: '/settings', icon: Settings },
 ]

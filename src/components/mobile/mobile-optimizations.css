@@ -1,0 +1,257 @@
+/* Mobile Optimizations for TradeMaster Pro */
+
+/* iPad and Mobile specific optimizations */
+@media (max-width: 1024px) {
+  /* Larger touch targets */
+  .apple-button, .btn {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Better spacing for mobile */
+  .apple-card {
+    margin-bottom: 16px;
+  }
+  
+  /* Optimized text sizes */
+  .mobile-text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+  
+  .mobile-text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  
+  /* Better contrast for mobile */
+  .mobile-high-contrast {
+    color: #1f2937;
+    font-weight: 600;
+  }
+  
+  .dark .mobile-high-contrast {
+    color: #f9fafb;
+  }
+  
+  /* Smooth scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Larger notification cards for mobile */
+  .mobile-notification {
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Better visual hierarchy */
+  .mobile-card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  
+  .mobile-card-content {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  
+  /* Improved button spacing */
+  .mobile-button-group {
+    gap: 12px;
+  }
+  
+  .mobile-button-group .btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* iPad specific (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Two-column layout for better space usage */
+  .ipad-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  /* Three-column for stats */
+  .ipad-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  /* Larger cards for iPad */
+  .ipad-card {
+    padding: 20px;
+    border-radius: 16px;
+  }
+  
+  /* Better typography for iPad */
+  .ipad-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  
+  .ipad-subheading {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}
+
+/* Mobile phone specific (up to 767px) */
+@media (max-width: 767px) {
+  /* Single column layout */
+  .mobile-single-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* Larger touch targets for phones */
+  .mobile-touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  /* Better spacing for small screens */
+  .mobile-compact {
+    padding: 12px;
+    margin: 8px 0;
+  }
+  
+  /* Simplified navigation for mobile */
+  .mobile-nav-item {
+    padding: 16px;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+}
+
+/* Animations for mobile interactions */
+@media (max-width: 1024px) {
+  .mobile-tap-animation {
+    transition: transform 0.1s ease-in-out;
+  }
+  
+  .mobile-tap-animation:active {
+    transform: scale(0.98);
+  }
+  
+  /* Smooth slide-in animations */
+  .mobile-slide-in {
+    animation: slideInFromRight 0.3s ease-out;
+  }
+  
+  @keyframes slideInFromRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Fade in animation for notifications */
+  .mobile-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Pulse animation for important elements */
+  .mobile-pulse {
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    }
+  }
+}
+
+/* Dark mode optimizations for mobile */
+@media (max-width: 1024px) {
+  .dark .mobile-card {
+    background: rgba(31, 41, 55, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+  }
+  
+  .dark .mobile-notification {
+    background: rgba(17, 24, 39, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(55, 65, 81, 0.4);
+  }
+}
+
+/* Accessibility improvements for mobile */
+@media (max-width: 1024px) {
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .mobile-high-contrast-mode {
+      border: 2px solid currentColor;
+      background: white;
+      color: black;
+    }
+    
+    .dark .mobile-high-contrast-mode {
+      background: black;
+      color: white;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-tap-animation,
+    .mobile-slide-in,
+    .mobile-fade-in,
+    .mobile-pulse {
+      animation: none;
+      transition: none;
+    }
+  }
+  
+  /* Focus indicators for keyboard navigation */
+  .mobile-focus:focus {
+    outline: 3px solid #3b82f6;
+    outline-offset: 2px;
+  }
+}
+
+/* Print styles for mobile */
+@media print {
+  .mobile-notification,
+  .mobile-quick-actions {
+    display: none;
+  }
+  
+  .mobile-card {
+    break-inside: avoid;
+    margin-bottom: 20px;
+  }
+}
