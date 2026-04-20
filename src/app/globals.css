@@ -339,3 +339,164 @@ nav, .navigation {
   -ms-user-select: none;
   user-select: none;
 }
+
+/* iPad and Touch Optimizations */
+@media (pointer: coarse) {
+  /* Improve touch targets for tablets and mobile */
+  button, [role="button"], .btn {
+    @apply min-h-[48px] min-w-[48px];
+  }
+
+  /* Better touch feedback */
+  button, [role="button"] {
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
+    touch-action: manipulation;
+  }
+
+  /* Improve scrolling on iOS */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent zoom on double tap for iOS */
+  .no-zoom {
+    touch-action: manipulation;
+  }
+
+  /* Better form interactions */
+  input, textarea, select {
+    @apply min-h-[44px];
+    touch-action: manipulation;
+  }
+
+  /* Improve card interactions */
+  .apple-card {
+    touch-action: pan-y;
+  }
+
+  /* Better spacing for touch interfaces */
+  .touch-spacing {
+    @apply py-4 px-6;
+  }
+}
+
+/* iPad specific optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Better button sizes for iPad */
+  button, .btn {
+    @apply min-h-[52px] px-8 py-3;
+  }
+
+  /* Improve card sizing for iPad */
+  .apple-card {
+    @apply p-6;
+  }
+
+  /* Better typography scaling */
+  h1 { @apply text-3xl; }
+  h2 { @apply text-2xl; }
+  h3 { @apply text-xl; }
+
+  /* Improve grid layouts for iPad */
+  .grid-cols-1.md\\:grid-cols-2 {
+    @apply grid-cols-2;
+  }
+}
+
+/* High DPI displays (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Sharper borders and shadows */
+  .apple-card {
+    border-width: 0.5px;
+  }
+
+  /* Better font rendering */
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+  }
+}
+
+/* PWA specific optimizations */
+@media (display-mode: standalone) {
+  /* Full screen PWA mode */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Adjust for notch devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Performance optimizations for touch devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Disable hover effects on touch devices */
+  .hover\\:shadow-md:hover {
+    @apply shadow-md;
+  }
+
+  /* Always show focus indicators */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    @apply ring-2 ring-blue-500 ring-offset-2;
+  }
+}
+
+/* Service Worker and Offline optimizations */
+.offline-indicator {
+  @apply fixed top-4 right-4 z-50 bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg text-sm;
+}
+
+.sync-indicator {
+  @apply fixed top-4 left-4 z-50 bg-green-100 border border-green-300 text-green-700 px-3 py-2 rounded-lg text-sm;
+}
+
+/* Optimistic Updates animations */
+@keyframes optimistic-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.optimistic-update {
+  animation: optimistic-fade-in 0.3s ease-out;
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+  @apply flex items-center justify-center py-4 text-sm text-muted-foreground;
+}
+
+/* Better loading states for touch */
+.touch-loading {
+  @apply flex items-center justify-center min-h-[200px];
+}
+
+.touch-loading .loading-spinner {
+  @apply h-8 w-8;
+}
+
+/* Improved modal dialogs for touch */
+@media (pointer: coarse) {
+  [data-radix-dialog-overlay] {
+    touch-action: none;
+  }
+
+  [data-radix-dialog-content] {
+    touch-action: pan-y;
+  }
+}

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { OptimisticUpdatesProvider } from '@/components/ui/optimistic-updates'
+import { SyncStatusCard } from '@/components/ui/sync-status'
 import { Navigation } from '@/components/layout/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
@@ -698,10 +700,15 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Navigation />
-      <main className="p-6 lg:mr-64">
-        <div className="max-w-7xl mx-auto space-y-8">
+    <OptimisticUpdatesProvider>
+      <div className="min-h-screen">
+        <Navigation />
+        <main className="p-6 lg:mr-64">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Sync Status Card - Mobile optimized */}
+            <div className="block sm:hidden">
+              <SyncStatusCard />
+            </div>
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -1023,5 +1030,6 @@ export default function Dashboard() {
         </div>
       </main>
     </div>
+    </OptimisticUpdatesProvider>
   )
 }
