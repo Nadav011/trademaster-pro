@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigation } from '@/components/layout/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
@@ -304,9 +304,19 @@ export default function Dashboard() {
     }
   }
 
-  const loadDashboardData = useCallback(async () => {
+  // Prevent overlapping loads and allow background refresh without UI spinner
+  const isLoadingRef = useRef(false)
+
+  const loadDashboardData = useCallback(async (options?: { background?: boolean }) => {
+    const background = options?.background === true
     try {
-      setIsLoading(true)
+      if (isLoadingRef.current) {
+        return
+      }
+      isLoadingRef.current = true
+      if (!background) {
+        setIsLoading(true)
+      }
       setError(null)
       console.log('🚀 Loading dashboard data...')
 
@@ -342,7 +352,9 @@ export default function Dashboard() {
           winning_trades: 0,
           losing_trades: 0,
         })
+      if (!background) {
         setIsLoading(false)
+      }
         return
       }
       
@@ -525,7 +537,9 @@ export default function Dashboard() {
 
       // Set KPIs only after all data is ready
       setKpis(calculatedKpis)
-      setIsLoading(false)
+      if (!background) {
+        setIsLoading(false)
+      }
 
       // Load current prices for open trades (only if API key is configured)
       // This will only update the open trades display, not the KPIs
@@ -542,7 +556,11 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
       setError('שגיאה בטעינת נתוני הדאשבורד')
-      setIsLoading(false)
+      if (!background) {
+        setIsLoading(false)
+      }
+    } finally {
+      isLoadingRef.current = false
     }
   }, [loadCurrentPrices])
 
@@ -578,7 +596,7 @@ export default function Dashboard() {
           
           // Reload dashboard data after a short delay (non-blocking)
           setTimeout(() => {
-            loadDashboardData().catch(console.error)
+            loadDashboardData({ background: true }).catch(console.error)
           }, 1000)
         } else {
           console.log('⚠️ No saved auth state, but checking if user is authenticated...')
@@ -604,7 +622,7 @@ export default function Dashboard() {
             await startAutoSyncService()
             
             // Reload dashboard data after sync
-            setTimeout(loadDashboardData, 1000)
+            setTimeout(() => loadDashboardData({ background: true }), 1000)
           } else {
             console.log('⚠️ User not authenticated, skipping auto-sync')
           }
@@ -629,7 +647,7 @@ export default function Dashboard() {
           const event = JSON.parse(e.newValue)
           if (event.type === 'DATA_SYNCED') {
             console.log('📱 Data synced from another tab, reloading dashboard...')
-            loadDashboardData()
+            loadDashboardData({ background: true })
           }
         } catch (error) {
           console.error('Failed to parse sync event:', error)
@@ -640,7 +658,9 @@ export default function Dashboard() {
     window.addEventListener('storage', handleStorageChange)
     
     // Auto-refresh dashboard data every 5 minutes (increased frequency for better sync)
-    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
+    const interval = setInterval(() => {
+      loadDashboardData({ background: true })
+    }, 5 * 60 * 1000)
     
     // Auto-refresh prices every 3 minutes (increased frequency for better sync)
     const priceInterval = setInterval(async () => {
@@ -669,7 +689,7 @@ export default function Dashboard() {
   const handleTradeUpdate = (updatedTrades: TradeWithCalculations[]) => {
     setOpenTrades(updatedTrades)
     // Also refresh dashboard data when trades are updated
-    loadDashboardData()
+    loadDashboardData({ background: true })
   }
 
   if (error) {
@@ -818,7 +838,7 @@ export default function Dashboard() {
                     alert(`אחרי סינכרון:\nעסקאות: ${finalTrades.length}\nרשומות הון: ${finalCapital.length}\n\nשינויים:\nעסקאות: ${finalTrades.length - localTrades.length}\nרשומות הון: ${finalCapital.length - localCapital.length}`)
                     
                     // Reload dashboard
-                    loadDashboardData()
+                    loadDashboardData({ background: true })
                   } catch (error) {
                     alert(`שגיאה: ${error}`)
                   }
@@ -894,7 +914,7 @@ export default function Dashboard() {
                     await triggerAutoSync()
                     
                     // Reload dashboard data after sync
-                    setTimeout(loadDashboardData, 1000)
+                    setTimeout(() => loadDashboardData({ background: true }), 1000)
                     alert('סינכרון הושלם בהצלחה!')
                   } catch (error) {
                     console.error('Manual sync failed:', error)

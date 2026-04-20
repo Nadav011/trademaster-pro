@@ -844,7 +844,8 @@ export const initializeAuthListener = () => {
       // Start auto-sync service if not already running
       if (!autoSyncService.isServiceRunning()) {
         console.log('🚀 Starting auto-sync service due to auth state change')
-        autoSyncService.startPeriodicSync(15000)
+        // Use default daily interval instead of debug 15s
+        autoSyncService.startPeriodicSync()
       }
     } else {
       // User signed out - clear localStorage
