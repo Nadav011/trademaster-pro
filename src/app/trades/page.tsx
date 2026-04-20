@@ -1,19 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Navigation } from '@/components/layout/navigation'
 import { TradeCard } from '@/components/trades/trade-card'
 import { TradesFilter } from '@/components/trades/trades-filter'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, RefreshCw, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { 
   tradesDb, 
-  marketDataUtils,
   initializeDatabase 
 } from '@/lib/database-client'
+import { marketDataStore } from '@/lib/market-data-store'
 import { 
   Trade, 
   TradeWithCalculations, 
@@ -27,8 +27,56 @@ export default function TradesList() {
   const [filteredTrades, setFilteredTrades] = useState<TradeWithCalculations[]>([])
   const [filters, setFilters] = useState<TradeFilters>({})
   const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [marketState, setMarketState] = useState(marketDataStore.getState())
+
+  // Subscribe to market data updates
+  useEffect(() => {
+    const unsubscribe = marketDataStore.subscribe((state) => {
+      setMarketState(state)
+      
+      // Update trades with new prices
+      if (Object.keys(state.stocks).length > 0) {
+        updateTradesWithPrices(state.stocks)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const updateTradesWithPrices = useCallback((stocks: Record<string, any>) => {
+    setTrades(prevTrades => {
+      return prevTrades.map(trade => {
+        // Skip closed trades
+        if (trade.exit_price) return trade
+
+        const stockData = stocks[trade.symbol]
+        if (!stockData) return trade
+
+        const currentPrice = stockData.price
+        const entryPrice = trade.entry_price
+        const positionSize = trade.position_size
+        const direction = trade.direction
+
+        // Calculate unrealized P&L
+        const priceDiff = direction === 'Long' ? currentPrice - entryPrice : entryPrice - currentPrice
+        const unrealizedPnl = priceDiff * positionSize
+
+        // Calculate R units
+        const riskPerShare = Math.abs(entryPrice - trade.planned_stop_loss)
+        const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * positionSize) : 0
+
+        return {
+          ...trade,
+          current_price: currentPrice,
+          daily_change: stockData.change,
+          unrealized_pnl: unrealizedPnl,
+          unrealized_r_units: unrealizedRUnits,
+          unrealized_percentage: (priceDiff / entryPrice) * 100,
+        }
+      })
+    })
+  }, [])
 
   useEffect(() => {
     loadTrades()
@@ -43,8 +91,8 @@ export default function TradesList() {
       setIsLoading(true)
       setError(null)
       
-      // Initialize database without waiting for sync
-      initializeDatabase().catch(console.error)
+      // Initialize database
+      await initializeDatabase()
 
       const allTrades = await tradesDb.findAll()
       
@@ -62,105 +110,23 @@ export default function TradesList() {
         .sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime())
 
       setTrades(tradesWithCalculations)
+      setIsLoading(false)
 
-      // Load current prices for open trades in background (non-blocking)
+      // Extract symbols from open trades and add to market data store
       const openTrades = tradesWithCalculations.filter(trade => !trade.exit_price)
       if (openTrades.length > 0) {
-        // Don't wait for prices to load - show trades immediately
-        loadCurrentPrices(openTrades).catch(console.error)
+        const symbols = [...new Set(openTrades.map(trade => trade.symbol))]
+        marketDataStore.addSymbols(symbols)
+        
+        // Initialize store if not already initialized
+        if (!marketDataStore.getState().lastUpdate) {
+          await marketDataStore.initialize(symbols)
+        }
       }
     } catch (err) {
       console.error('Failed to load trades:', err)
       setError('שגיאה בטעינת העסקאות')
-    } finally {
       setIsLoading(false)
-    }
-  }
-
-  const loadCurrentPrices = async (trades: TradeWithCalculations[]) => {
-    try {
-      setIsRefreshingPrices(true)
-      const symbols = [...new Set(trades.map(trade => trade.symbol))]
-      if (symbols.length === 0) return
-
-      // Import finnhub API
-      const { finnhubAPI } = await import('@/lib/finnhub')
-      const { apiConfig } = await import('@/lib/api-config')
-      
-      // Set up API key
-      const finnhubApiKey = apiConfig.getFinnhubApiKey()
-      if (finnhubApiKey) {
-        finnhubAPI.setApiKey(finnhubApiKey)
-      }
-
-      // Get current prices with rate limiting
-      const prices: PromiseSettledResult<{ symbol: string; data: any }>[] = []
-      const batchSize = 5 // Smaller batches for better performance
-      
-      for (let i = 0; i < symbols.length; i += batchSize) {
-        const batch = symbols.slice(i, i + batchSize)
-        
-        const batchPrices = await Promise.allSettled(
-          batch.map(async (symbol) => {
-            try {
-              const quote = await finnhubAPI.getQuote(symbol)
-              return { symbol, data: quote }
-            } catch (error) {
-              console.error(`Failed to get price for ${symbol}:`, error)
-              return { symbol, data: null }
-            }
-          })
-        )
-        
-        prices.push(...batchPrices)
-        
-        // Small delay between batches to avoid rate limiting
-        if (i + batchSize < symbols.length) {
-          await new Promise(resolve => setTimeout(resolve, 200))
-        }
-      }
-
-      // Update trades with current prices
-      const updatedTrades = trades.map(trade => {
-        const priceResult = prices.find(p => 
-          p.status === 'fulfilled' && p.value.symbol === trade.symbol
-        )
-        
-        if (priceResult && priceResult.status === 'fulfilled' && priceResult.value.data) {
-          const currentPrice = priceResult.value.data.price
-          const dailyChange = priceResult.value.data.change
-          
-          return {
-            ...trade,
-            current_price: currentPrice,
-            daily_change: dailyChange,
-            unrealized_pnl: trade.direction === 'Long' 
-              ? (currentPrice - trade.entry_price) * trade.position_size
-              : (trade.entry_price - currentPrice) * trade.position_size,
-            unrealized_r_units: trade.planned_stop_loss 
-              ? ((currentPrice - trade.entry_price) * (trade.direction === 'Long' ? 1 : -1)) / 
-                Math.abs(trade.entry_price - trade.planned_stop_loss)
-              : 0,
-            unrealized_percentage: ((currentPrice - trade.entry_price) / trade.entry_price) * 100 * 
-              (trade.direction === 'Long' ? 1 : -1)
-          }
-        }
-        
-        return trade
-      })
-
-      setTrades(updatedTrades)
-    } catch (error) {
-      console.error('Failed to load current prices:', error)
-    } finally {
-      setIsRefreshingPrices(false)
-    }
-  }
-
-  const handleRefreshPrices = async () => {
-    const openTrades = trades.filter(trade => !trade.exit_price)
-    if (openTrades.length > 0) {
-      await loadCurrentPrices(openTrades)
     }
   }
 
@@ -198,7 +164,6 @@ export default function TradesList() {
             trade.result_dollars !== undefined && trade.result_dollars < 0
           )
           break
-        // 'all' doesn't filter anything
       }
     }
 
@@ -210,53 +175,15 @@ export default function TradesList() {
 
     if (filters.date_to) {
       const toDate = new Date(filters.date_to)
-      toDate.setHours(23, 59, 59, 999) // End of day
+      toDate.setHours(23, 59, 59, 999)
       filtered = filtered.filter(trade => new Date(trade.datetime) <= toDate)
     }
 
     setFilteredTrades(filtered)
   }
 
-  const refreshPrices = async () => {
-    setIsRefreshingPrices(true)
-    try {
-      const openTrades = trades.filter(trade => !trade.exit_price)
-      if (openTrades.length === 0) return
-
-      const symbols = [...new Set(openTrades.map(trade => trade.symbol))]
-      const marketData = await marketDataUtils.getCurrentPrices(symbols)
-
-      const updatedTrades = trades.map(trade => {
-        if (trade.exit_price) return trade // Skip closed trades
-
-        const currentData = marketData[trade.symbol]
-        if (!currentData) return trade
-
-        const currentPrice = currentData.price
-        const unrealizedPnl = trade.direction === 'Long' 
-          ? (currentPrice - trade.entry_price) * trade.position_size
-          : (trade.entry_price - currentPrice) * trade.position_size
-
-        const riskPerShare = Math.abs(trade.entry_price - trade.planned_stop_loss)
-        const unrealizedRUnits = riskPerShare > 0 ? unrealizedPnl / (riskPerShare * trade.position_size) : 0
-        const unrealizedPercentage = ((currentPrice - trade.entry_price) / trade.entry_price) * 100
-
-        return {
-          ...trade,
-          current_price: currentPrice,
-          daily_change: currentData.change,
-          unrealized_pnl: unrealizedPnl,
-          unrealized_r_units: unrealizedRUnits,
-          unrealized_percentage: unrealizedPercentage,
-        }
-      })
-
-      setTrades(updatedTrades)
-    } catch (err) {
-      console.error('Failed to refresh prices:', err)
-    } finally {
-      setIsRefreshingPrices(false)
-    }
+  const handleManualRefresh = async () => {
+    await marketDataStore.refresh()
   }
 
   const handleEditTrade = (trade: TradeWithCalculations) => {
@@ -268,14 +195,12 @@ export default function TradesList() {
       try {
         await tradesDb.delete(trade.id)
         
-        // Trigger immediate sync after deleting trade
-        console.log('🔄 Trade deleted, triggering immediate sync...')
+        // Trigger immediate sync
         try {
           const { performImmediateSync } = await import('@/lib/supabase')
           await performImmediateSync()
-          console.log('✅ Immediate sync completed after trade deletion')
         } catch (syncError) {
-          console.error('❌ Immediate sync failed after trade deletion:', syncError)
+          console.error('Immediate sync failed:', syncError)
         }
         
         await loadTrades()
@@ -308,13 +233,16 @@ export default function TradesList() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <main className="p-6 lg:mr-64">
           <div className="max-w-7xl mx-auto">
             <Card className="apple-card">
               <CardContent className="p-6">
-                <div className="text-center">טוען עסקאות...</div>
+                <div className="text-center">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <div>טוען עסקאות...</div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -324,7 +252,7 @@ export default function TradesList() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       <main className="p-6 lg:mr-64">
         <div className="max-w-7xl mx-auto space-y-8">
@@ -337,17 +265,24 @@ export default function TradesList() {
               <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm sm:text-base">
                 ניהול ועקיבה אחר כל העסקאות שלך
               </p>
+              {marketState.lastUpdate && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  מחירים עודכנו: {new Date(marketState.lastUpdate).toLocaleTimeString('he-IL')}
+                  {' • '}
+                  רענון אוטומטי כל 10 דקות
+                </p>
+              )}
             </div>
             <div className="flex items-center space-x-2 space-x-reverse">
               <Button
                 variant="outline"
-                onClick={refreshPrices}
-                disabled={isRefreshingPrices}
+                onClick={handleManualRefresh}
+                disabled={marketState.isRefreshing}
                 size="sm"
+                className="flex items-center space-x-2 space-x-reverse"
               >
-                <RefreshCw className={`h-4 w-4 ml-2 ${isRefreshingPrices ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${marketState.isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">רענן מחירים</span>
-                <span className="sm:hidden">רענן</span>
               </Button>
               <Link href="/add-trade">
                 <Button className="apple-button" size="sm">
@@ -367,67 +302,75 @@ export default function TradesList() {
             </Card>
           )}
 
+          {marketState.error && (
+            <Card className="apple-card border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+              <CardContent className="p-4">
+                <div className="text-yellow-800 dark:text-yellow-200">{marketState.error}</div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <Card className="apple-card">
+            <Card className="apple-card shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   סך עסקאות
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white">
                   {stats.totalTrades}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {stats.openTrades} פתוחות, {stats.closedTrades} סגורות
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {stats.openTrades} פתוחות • {stats.closedTrades} סגורות
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="apple-card">
+            <Card className="apple-card shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   P&L צף
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${getProfitLossColor(stats.totalUnrealizedPnl)}`}>
+                <div className={`text-3xl font-bold ${getProfitLossColor(stats.totalUnrealizedPnl)}`}>
                   {formatCurrency(stats.totalUnrealizedPnl)}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {stats.openTrades} עסקאות פתוחות
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="apple-card">
+            <Card className="apple-card shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   P&L סגור
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${getProfitLossColor(stats.totalRealizedPnl)}`}>
+                <div className={`text-3xl font-bold ${getProfitLossColor(stats.totalRealizedPnl)}`}>
                   {formatCurrency(stats.totalRealizedPnl)}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {stats.closedTrades} עסקאות סגורות
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="apple-card">
+            <Card className="apple-card shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   סך R Units
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${getProfitLossColor(stats.totalRUnits)}`}>
+                <div className={`text-3xl font-bold ${getProfitLossColor(stats.totalRUnits)}`}>
                   {stats.totalRUnits.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   עסקאות סגורות בלבד
                 </p>
               </CardContent>
@@ -443,7 +386,7 @@ export default function TradesList() {
 
           {/* Trades List */}
           {filteredTrades.length === 0 ? (
-            <Card className="apple-card">
+            <Card className="apple-card shadow-md">
               <CardContent className="p-8">
                 <div className="text-center">
                   <TrendingUp className="h-16 w-16 text-gray-400 mx-auto mb-4" />
