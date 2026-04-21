@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, RefreshCw, Wifi, WifiOff, DollarSign } from 'lucide-react'
+import { TrendingUp, TrendingDown, RefreshCw, Wifi, WifiOff, DollarSign, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { marketDataUtils } from '@/lib/database-client'
 import { MarketData, Trade, TradeWithCalculations } from '@/types'
@@ -14,7 +14,7 @@ interface LiveStocksProps {
   onTradeUpdate?: (trades: TradeWithCalculations[]) => void
 }
 
-export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStocksProps) {
+const LiveStocks = memo(function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStocksProps) {
   const [stocks, setStocks] = useState<Record<string, MarketData>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
@@ -118,7 +118,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
   }
 
   return (
-    <Card className="apple-card">
+    <Card className="apple-card hover:shadow-xl transition-all duration-300">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2 space-x-reverse">
@@ -149,12 +149,15 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="text-center py-4">
-            <div className="text-red-600 text-sm mb-2">{error}</div>
-            <div className="space-y-2">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+              <WifiOff className="h-8 w-8 text-red-600" />
+            </div>
+            <div className="text-red-600 text-lg mb-4">{error}</div>
+            <div className="space-y-3">
               <button
                 onClick={fetchStocks}
-                className="text-blue-600 hover:text-blue-700 text-sm"
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
               >
                 נסה שוב
               </button>
@@ -166,30 +169,32 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
         )}
 
         {symbols.length === 0 ? (
-          <div className="text-center py-8">
-            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full flex items-center justify-center">
+              <Activity className="h-10 w-10 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
               אין מניות להצגה
-            </p>
-            <p className="text-sm text-gray-400 dark:text-gray-500">
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
               הוסף עסקאות כדי לראות מניות בלייב
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {symbols.map((symbol) => {
               const stock = stocks[symbol]
               if (!stock) {
                 return (
                   <Link key={symbol} href={`/trades?symbol=${symbol}`}>
-                    <Card className="apple-card border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3 space-x-reverse mb-3">
-                          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                          <div className="font-bold text-lg">{symbol}</div>
+                    <Card className="apple-card border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 animate-pulse">
+                      <CardContent className="p-5">
+                        <div className="flex items-center space-x-3 space-x-reverse mb-4">
+                          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                          <div className="font-bold text-xl">{symbol}</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-400 mb-2">טוען...</div>
+                          <div className="text-3xl font-bold text-gray-400 mb-2">טוען...</div>
                           <div className="text-sm text-gray-500">מחיר נוכחי</div>
                         </div>
                       </CardContent>
@@ -203,27 +208,27 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
 
               return (
                 <Link key={symbol} href={`/trades?symbol=${symbol}`}>
-                  <Card className={`apple-card border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${
-                    stock.change > 0 ? 'border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700' : 
-                    stock.change < 0 ? 'border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700' : 
-                    'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  <Card className={`apple-card border-2 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer ${
+                    stock.change > 0 ? 'border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10' : 
+                    stock.change < 0 ? 'border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/10 dark:to-rose-900/10' : 
+                    'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900/10 dark:to-slate-900/10'
                   }`}>
-                  <CardContent className="p-4">
+                  <CardContent className="p-5">
                     {/* Header with symbol and icon */}
-                    <div className="flex items-center space-x-3 space-x-reverse mb-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    <div className="flex items-center space-x-3 space-x-reverse mb-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
                         stock.change > 0 ? 'bg-green-100 dark:bg-green-900/30' :
                         stock.change < 0 ? 'bg-red-100 dark:bg-red-900/30' :
                         'bg-gray-100 dark:bg-gray-800'
                       }`}>
                         {getChangeIcon(stock.change)}
                       </div>
-                      <div className="font-bold text-lg text-gray-900 dark:text-white">{symbol}</div>
+                      <div className="font-bold text-xl text-gray-900 dark:text-white">{symbol}</div>
                     </div>
 
                     {/* Current Price */}
-                    <div className="text-center mb-4">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    <div className="text-center mb-5">
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         {formatCurrency(stock.price)}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">מחיר נוכחי</div>
@@ -231,7 +236,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
 
                     {/* Daily Change - Show position change if available, otherwise stock change */}
                     {hasPosition ? (
-                      <div className={`p-3 rounded-lg mb-3 ${
+                      <div className={`p-4 rounded-xl mb-4 shadow-sm ${
                         tradeProfit.dailyChange > 0 ? 'bg-green-50 dark:bg-green-900/20' :
                         tradeProfit.dailyChange < 0 ? 'bg-red-50 dark:bg-red-900/20' :
                         'bg-gray-50 dark:bg-gray-900/20'
@@ -240,12 +245,12 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
                         <div className={`font-bold text-lg ${getChangeColor(tradeProfit.dailyChange)} mb-1`}>
                           {tradeProfit.dailyChange >= 0 ? '+' : ''}{formatCurrency(tradeProfit.dailyChange)}
                         </div>
-                        <div className={`text-sm ${getChangeColor(tradeProfit.dailyChange)}`}>
+                        <div className={`text-sm font-semibold ${getChangeColor(tradeProfit.dailyChange)}`}>
                           ({tradeProfit.dailyChangePercent >= 0 ? '+' : ''}{tradeProfit.dailyChangePercent.toFixed(2)}%)
                         </div>
                       </div>
                     ) : (
-                      <div className={`p-3 rounded-lg mb-3 ${
+                      <div className={`p-4 rounded-xl mb-4 shadow-sm ${
                         stock.change > 0 ? 'bg-blue-50 dark:bg-blue-900/20' :
                         stock.change < 0 ? 'bg-red-50 dark:bg-red-900/20' :
                         'bg-gray-50 dark:bg-gray-900/20'
@@ -254,7 +259,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
                         <div className={`font-bold text-lg ${getChangeColor(stock.change)} mb-1`}>
                           {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}$
                         </div>
-                        <div className={`text-sm ${getChangeColor(stock.change)}`}>
+                        <div className={`text-sm font-semibold ${getChangeColor(stock.change)}`}>
                           ({stock.change_percent >= 0 ? '+' : ''}{stock.change_percent.toFixed(2)}%)
                         </div>
                       </div>
@@ -262,16 +267,16 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
 
                     {/* Trade Profit/Loss */}
                     {hasPosition && (
-                      <div className={`p-3 rounded-lg ${
+                      <div className={`p-4 rounded-xl mb-4 shadow-sm ${
                         tradeProfit.amount > 0 ? 'bg-green-50 dark:bg-green-900/20' :
                         tradeProfit.amount < 0 ? 'bg-red-50 dark:bg-red-900/20' :
                         'bg-gray-50 dark:bg-gray-900/20'
                       }`}>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">רווח/הפסד:</div>
-                        <div className={`font-bold ${getChangeColor(tradeProfit.amount)}`}>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">רווח/הפסד:</div>
+                        <div className={`font-bold text-lg ${getChangeColor(tradeProfit.amount)} mb-1`}>
                           {tradeProfit.percentage >= 0 ? '+' : ''}{tradeProfit.percentage.toFixed(2)}%
                         </div>
-                        <div className={`text-sm ${getChangeColor(tradeProfit.amount)}`}>
+                        <div className={`text-sm font-semibold ${getChangeColor(tradeProfit.amount)}`}>
                           {tradeProfit.amount >= 0 ? '+' : ''}{formatCurrency(tradeProfit.amount)}
                         </div>
                       </div>
@@ -279,7 +284,7 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
 
                     {/* Position Info */}
                     {hasPosition && (
-                      <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                      <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                         {tradeProfit.totalShares} מניות • {formatCurrency(tradeProfit.totalCost || 0)} השקעה
                       </div>
                     )}
@@ -292,8 +297,8 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
         )}
 
         {isLoading && (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
             <div className="text-sm text-gray-500">טוען נתונים...</div>
           </div>
         )}
@@ -301,3 +306,5 @@ export function LiveStocks({ symbols, openTrades = [], onTradeUpdate }: LiveStoc
     </Card>
   )
 }
+
+export { LiveStocks }
