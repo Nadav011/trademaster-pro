@@ -6,6 +6,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards'
 import { OpenTrades } from '@/components/dashboard/open-trades'
 import { StopLossAlerts } from '@/components/dashboard/stop-loss-alerts'
 import { LiveStocks } from '@/components/dashboard/live-stocks'
+import { LivePreview } from '@/components/dev/live-preview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
@@ -968,6 +969,11 @@ export default function Dashboard() {
             isLoadingPrices={isLoadingPrices}
             onCloseTrade={handleCloseTrade}
           />
+
+          {/* Development Tools - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <LivePreview />
+          )}
 
           {/* Additional Dashboard Sections */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
