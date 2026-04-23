@@ -68,7 +68,7 @@ export default function DataManagement() {
         console.error('❌ Immediate sync failed after importing data:', syncError)
       }
       
-      setMessage({ type: 'success', text: 'הנתונים יובאו בהצלחה! הדף ירענן כעת.' })
+      setMessage({ type: 'success', text: 'הנתונים יובאו בהצלחה! הדשבורד יתעדכן אוטומטית.' })
       // Update stats after import
       setDataStats(DataManager.getDataStats())
     } catch (error) {
@@ -97,10 +97,9 @@ export default function DataManagement() {
         console.error('❌ Immediate sync failed after clearing data:', syncError)
       }
       
-      setMessage({ type: 'success', text: 'כל הנתונים נמחקו בהצלחה! הדף ירענן כעת.' })
+      setMessage({ type: 'success', text: 'כל הנתונים נמחקו בהצלחה! הדשבורד יתעדכן אוטומטית.' })
       // Update stats after clearing
       setDataStats(DataManager.getDataStats())
-      setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
       setMessage({ type: 'error', text: 'שגיאה במחיקת הנתונים' })
     } finally {
