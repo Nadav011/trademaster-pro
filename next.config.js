@@ -5,10 +5,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable static optimization to prevent _document issues
-  output: 'standalone',
   // Ensure proper page handling
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
+  // Add basePath for Netlify deployment
+  basePath: '',
+  assetPrefix: '',
 }
 
 module.exports = nextConfig
